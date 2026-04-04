@@ -1,0 +1,42 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(where claude:*)",
+      "Read(//c/Users/takatoshi-saito/AppData/Roaming/npm/**)",
+      "Read(//c/Users/takatoshi-saito/AppData/Local/Programs/**)",
+      "Bash(powershell.exe -Command \"Get-Command claude -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source\")",
+      "Bash(npm --version)",
+      "Bash(echo $APPDATA)",
+      "Read(//c//**)",
+      "Bash(python -c \":*)",
+      "WebSearch",
+      "WebFetch(domain:diamond-rm.net)",
+      "WebFetch(domain:ecact.jp)",
+      "WebFetch(domain:bizzine.jp)",
+      "Bash(pip install:*)",
+      "Bash(\"/c/Users/takatoshi-saito/OneDrive/00personal/ClaudeCodeFolder/kyorindo-cx/06_outputs/20260404_ロードマップ作製に必要な情報_議論ログ.md\":*)",
+      "Bash(\"C:\\\\Users\\\\takatoshi-saito\\\\OneDrive\\\\00personal\\\\ClaudeCodeFolder\\\\kyorindo-cx\\\\04_references\\\\杏林堂_現行システム一覧.md\":*)",
+      "Bash(python3 -c \":*)",
+      "Bash(python3:*)",
+      "WebFetch(domain:iotnews.jp)",
+      "WebFetch(domain:hibiki.dreamarts.co.jp)",
+      "WebFetch(domain:gekiryu-online.jp)",
+      "WebFetch(domain:www.tsuruha-hd.co.jp)",
+      "WebFetch(domain:www.ryutsuu.biz)",
+      "WebFetch(domain:www.tsuruha.co.jp)",
+      "WebFetch(domain:www.kusurinofukutaro.co.jp)",
+      "WebFetch(domain:www.lady-drug.co.jp)",
+      "WebFetch(domain:tgn.tsuruha-hd.co.jp)",
+      "WebFetch(domain:www.drugeleven.com)",
+      "WebFetch(domain:www.tsuruha-hd.com)",
+      "WebFetch(domain:biz-maps.com)",
+      "WebFetch(domain:news.shoninsha.co.jp)",
+      "WebFetch(domain:adms.jins.co.jp)",
+      "WebFetch(domain:www.desknets.com)",
+      "WebFetch(domain:www.microsoft.com)",
+      "WebFetch(domain:www.digital.go.jp)",
+      "WebFetch(domain:digital-gov.note.jp)",
+      "WebFetch(domain:dxmagazine.jp)"
+    ]
+  }
+}
