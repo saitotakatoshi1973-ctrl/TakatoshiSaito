@@ -1,0 +1,10 @@
+{
+  "id": "takatoshisaito-plugin",
+  "name": "TakatoshiSaito Plugin",
+  "version": "0.0.1",
+  "minAppVersion": "1.5.0",
+  "description": "My first Obsidian plugin",
+  "author": "Takatoshi Saito",
+  "authorUrl": "https://github.com/saitotakoshi1973-ctrl",
+  "isDesktopOnly": false
+}
