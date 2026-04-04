@@ -1,7 +1,7 @@
 {
   "id": "takatoshisaito-plugin",
   "name": "TakatoshiSaito Plugin",
-  "version": "claudev0.0.1",
+  "version": "claudianv0.0.1",
   "minAppVersion": "1.5.0",
   "description": "My first Obsidian plugin",
   "author": "Takatoshi Saito",
