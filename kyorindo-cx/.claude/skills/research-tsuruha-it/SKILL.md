@@ -329,7 +329,46 @@ print(f"Excel更新完了: {added}件追加 → {EXCEL_PATH}")
 
 ---
 
-### STEP 7: 完了報告
+### STEP 7: GitHubへコミット＆プッシュ
+
+STEP 4〜6で作成・更新したファイルをまとめてGitHubにプッシュする。
+
+```bash
+cd "C:/Users/takatoshi-saito/OneDrive/00personal/ClaudeCodeFolder/kyorindo-cx"
+
+# 新規MDファイル・Excel・インデックスMDをステージ
+git add "04_references/ツルハHD_*.md"
+git add "04_references/ツルハHD_IT記事データベース.xlsx"
+
+# コミット（新規追加件数・期間を含む）
+git commit -m "ツルハHD IT記事収集: {N}件追加（{検索期間}分）
+
+- 新規MDファイル {N}件
+- Excelデータベース更新 ({N}件追加)
+- インデックスMD更新"
+
+# プッシュ
+git push origin main
+```
+
+#### GitHubでの確認URL
+
+プッシュ後、以下で確認できる：
+
+```
+https://github.com/{owner}/{repo}/blob/main/04_references/ツルハHD_IT記事データベース.xlsx
+```
+
+※ `.xlsx` はGitHub上でプレビュー表示される。
+
+#### 注意
+
+- `git push` 前に `git status` で意図しないファイルが含まれていないか確認する
+- Excelファイルが大きい場合（>50MB）はGit LFSが必要だが、通常の記事データベースは問題ない
+
+---
+
+### STEP 8: 完了報告
 
 以下を日本語で報告する：
 
@@ -343,6 +382,7 @@ print(f"Excel更新完了: {added}件追加 → {EXCEL_PATH}")
 **スキップ（重複）**: {N}件
 **Excelデータベース**: {N}件追加 → ツルハHD_IT記事データベース.xlsx
 **インデックス更新**: {更新済 / 新規作成}
+**GitHub**: プッシュ済 → {リポジトリURL}/blob/main/04_references/ツルハHD_IT記事データベース.xlsx
 ```
 
 ---
