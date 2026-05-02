@@ -1,0 +1,22 @@
+{
+  "id": "conv-1775362471229-eawrduteq",
+  "providerId": "claude",
+  "title": "利用可能ですか",
+  "titleGenerationStatus": "failed",
+  "createdAt": 1775362471229,
+  "updatedAt": 1776838377170,
+  "lastResponseAt": 1776832068032,
+  "sessionId": "f7163362-e11d-4e37-9a1a-e0afee3f7505",
+  "providerState": {
+    "providerSessionId": "f7163362-e11d-4e37-9a1a-e0afee3f7505"
+  },
+  "usage": {
+    "model": "sonnet",
+    "inputTokens": 0,
+    "cacheCreationInputTokens": 0,
+    "cacheReadInputTokens": 0,
+    "contextWindow": 200000,
+    "contextTokens": 0,
+    "percentage": 0
+  }
+}

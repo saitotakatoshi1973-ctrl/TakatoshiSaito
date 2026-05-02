@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Edit(C:/Users/takatoshi-saito/OneDrive/00personal/ClaudeCodeFolder/kyorindo-cx/**/*.md)",
+      "Write(C:/Users/takatoshi-saito/OneDrive/00personal/ClaudeCodeFolder/kyorindo-cx/**/*.md)",
+      "Bash(python*)",
+      "Bash(pip*)",
+      "WebFetch(*)"
+    ],
+    "defaultMode": "bypassPermissions"
+  }
+}

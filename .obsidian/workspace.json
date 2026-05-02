@@ -1,0 +1,233 @@
+{
+  "main": {
+    "id": "e9f8d1df2189df81",
+    "type": "split",
+    "children": [
+      {
+        "id": "bd9d1482bd567e33",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "07d58d9e99f809b5",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "kyorindo-cx/01_strategy/CX_roadmap_20260416_v3.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "CX_roadmap_20260416_v3"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "f6ad209ebba18bc9",
+    "type": "split",
+    "children": [
+      {
+        "id": "56572307e44504c4",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "0af3973482798f0c",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "ファイルエクスプローラ"
+            }
+          },
+          {
+            "id": "1f19e600ea57ef1e",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "検索"
+            }
+          },
+          {
+            "id": "18329a8b32e95a3b",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "ブックマーク"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 443.5
+  },
+  "right": {
+    "id": "29f73719f0eb71fc",
+    "type": "split",
+    "children": [
+      {
+        "id": "a90c78ea8db4cca5",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "a342d8e1c38feee6",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "バックリンク"
+            }
+          },
+          {
+            "id": "892018de7add79b6",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "アウトゴーイングリンク"
+            }
+          },
+          {
+            "id": "bc11cb2f667fd0d1",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "タグ"
+            }
+          },
+          {
+            "id": "f242a442bbe4b420",
+            "type": "leaf",
+            "state": {
+              "type": "all-properties",
+              "state": {
+                "sortOrder": "frequency",
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-archive",
+              "title": "すべてのプロパティ"
+            }
+          },
+          {
+            "id": "585ab1f8bfcd14b9",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "kyorindo-cx/01_strategy/CX_roadmap_20260416_v3.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "CX_roadmap_20260416_v3のアウトライン"
+            }
+          },
+          {
+            "id": "1b88997f5930ea00",
+            "type": "leaf",
+            "state": {
+              "type": "claudian-view",
+              "state": {},
+              "icon": "bot",
+              "title": "Claudian"
+            }
+          }
+        ],
+        "currentTab": 5
+      }
+    ],
+    "direction": "horizontal",
+    "width": 736.5
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:クイックスイッチャーを開く": false,
+      "graph:グラフビューを開く": false,
+      "canvas:新規キャンバスを作成": false,
+      "daily-notes:今日のデイリーノートを開く": false,
+      "templates:テンプレートを挿入": false,
+      "command-palette:コマンドパレットを開く": false,
+      "bases:新規ベースを作成": false,
+      "obsidian42-brat:BRAT": false,
+      "claudian:Open Claudian": false
+    }
+  },
+  "active": "1b88997f5930ea00",
+  "lastOpenFiles": [
+    "kyorindo-cx/04_references/ツルハHD_IT記事データベース.xlsx",
+    "kyorindo-cx/04_references/update_excel_db.py",
+    "kyorindo-cx/04_references/ツルハHD_中期経営計画_LIFESTOREビジョン_20260409.md",
+    "kyorindo-cx/04_references/ツルハHD_ウエルシアカスタマーAI_NEL_PB商品開発_20241219.md",
+    "kyorindo-cx/04_references/ツルハHD_2026年2月期決算_統合後初_シナジー計画_20260420.md",
+    "kyorindo-cx/04_references/競合DXベンチマーク_全社版_20260423.md",
+    "kyorindo-cx/04_references/競合DXベンチマーク_20260423.xlsx",
+    "kyorindo-cx/04_references/杏林堂_競合店リスト_20260423.md",
+    "kyorindo-cx/04_references/generate_dx_benchmark.py",
+    "kyorindo-cx/01_strategy/経営戦略本部_MVVサマリー_20260315.md",
+    "kyorindo-cx/01_strategy/経営戦略本部_方針サマリー_整理.md",
+    "kyorindo-cx/01_strategy/CX_roadmap_20260405_v2.md",
+    "kyorindo-cx/03_progress/CX推進部_進捗サマリー_20260405.md",
+    "kyorindo-cx/06_outputs/タスク一覧_分類別_20260405.md.tmp.20928.1775386616761",
+    "kyorindo-cx/06_outputs/タスク一覧_分類別_20260405.md",
+    "kyorindo-cx/06_outputs/タスク一覧_分類別_20260405.md.tmp.20928.1775385137898",
+    "kyorindo-cx/01_strategy/CX_roadmap_20260405_v2.md.tmp.20928.1775384482703",
+    "kyorindo-cx/01_strategy/CX_roadmap_20260405.md",
+    "kyorindo-cx/01_strategy/CX_roadmap_20260405_v2.md.tmp.20928.1775383968896",
+    "kyorindo-cx/01_strategy/CX_roadmap_20260405_v2.md.tmp.20928.1775383963180",
+    "kyorindo-cx/01_strategy/CX_roadmap_20260405_v2.md.tmp.20928.1775383957806",
+    "kyorindo-cx/01_strategy/CX_roadmap_20260405_v2.md.tmp.20928.1775383952304",
+    "kyorindo-cx/01_strategy/CX_roadmap_20260405 1.md",
+    "kyorindo-cx/06_outputs/20260404_ロードマップ作製に必要な情報_議論ログ.md",
+    "kyorindo-cx/02_issues/杏林堂_既存課題サマリー_20260405.md",
+    "kyorindo-cx/04_references/シフト管理アプリ比較_20260405.md",
+    "kyorindo-cx/00_organization/杏林堂薬局_組織図_20260401.md",
+    "無題のファイル.canvas",
+    "kyorindo-cx/04_references/ツルハグループ_システム一覧_20250803.md",
+    "kyorindo-cx/00_organization/ツルハHD_組織構成_20260404.md",
+    "kyorindo-cx/CLAUDE.md",
+    "kyorindo-cx/00_organization/ツルハグループ_事業会社概要_20260404.md",
+    "CLAUDE.md",
+    "README.md"
+  ]
+}

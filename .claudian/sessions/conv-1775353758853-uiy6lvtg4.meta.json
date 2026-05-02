@@ -1,0 +1,19 @@
+{
+  "id": "conv-1775353758853-uiy6lvtg4",
+  "title": "Organize and store project information",
+  "titleGenerationStatus": "success",
+  "createdAt": 1775353758853,
+  "updatedAt": 1775362274877,
+  "lastResponseAt": 1775361942315,
+  "sessionId": "2dfdaace-e5e7-410a-9325-9ed44f5c3313",
+  "sdkSessionId": "2dfdaace-e5e7-410a-9325-9ed44f5c3313",
+  "usage": {
+    "model": "sonnet",
+    "inputTokens": 0,
+    "cacheCreationInputTokens": 0,
+    "cacheReadInputTokens": 0,
+    "contextWindow": 200000,
+    "contextTokens": 0,
+    "percentage": 0
+  }
+}

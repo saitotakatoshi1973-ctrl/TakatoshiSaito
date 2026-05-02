@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "Bash(python kyorindo-cx/04_references/generate_dx_benchmark.py)",
+      "Bash(cp /c/Users/takatoshi-saito/OneDrive/00personal/ClaudeCodeFolder/.claude/worktrees/admiring-hypatia-5eb71d/kyorindo-cx/04_references/競合DXベンチマーク_全社版_20260423.md /c/Users/takatoshi-saito/OneDrive/00personal/ClaudeCodeFolder/kyorindo-cx/04_references/競合DXベンチマーク_全社版_20260423.md)",
+      "Bash(cp /c/Users/takatoshi-saito/OneDrive/00personal/ClaudeCodeFolder/.claude/worktrees/admiring-hypatia-5eb71d/kyorindo-cx/04_references/競合DXベンチマーク_20260423.xlsx /c/Users/takatoshi-saito/OneDrive/00personal/ClaudeCodeFolder/kyorindo-cx/04_references/競合DXベンチマーク_20260423.xlsx)",
+      "Bash(cp /c/Users/takatoshi-saito/OneDrive/00personal/ClaudeCodeFolder/.claude/worktrees/admiring-hypatia-5eb71d/kyorindo-cx/04_references/generate_dx_benchmark.py /c/Users/takatoshi-saito/OneDrive/00personal/ClaudeCodeFolder/kyorindo-cx/04_references/generate_dx_benchmark.py)"
+    ]
+  }
+}

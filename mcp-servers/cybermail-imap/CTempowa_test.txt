@@ -1,0 +1,21 @@
+folders: 216
+ 部門 | AQMkAGE0ODE0MjMyLTNj
+mitui  | AQMkAGE0ODE0MjMyLTNj
+RSS フィード | AAMkAGE0ODE0MjMyLTNj
+アーカイブ | AAMkAGE0ODE0MjMyLTNj
+その他 | AQMkAGE0ODE0MjMyLTNj
+下書き | AQMkAGE0ODE0MjMyLTNj
+会話の履歴 | AQMkAGE0ODE0MjMyLTNj
+検出された項目 | AAMkAGE0ODE0MjMyLTNj
+再通知設定済み | AAMkAGE0ODE0MjMyLTNj
+削除済みアイテム | AQMkAGE0ODE0MjMyLTNj
+削除済みアイテム/ga-tona-  | AQMkAGE0ODE0MjMyLTNj
+削除済みアイテム/sinn  | AQMkAGE0ODE0MjMyLTNj
+削除済みアイテム/turuha  | AQMkAGE0ODE0MjMyLTNj
+削除済みアイテム/ブライセン | AQMkAGE0ODE0MjMyLTNj
+受信トレイ | AQMkAGE0ODE0MjMyLTNj
+受信トレイ/01要対応 | AQMkAGE0ODE0MjMyLTNj
+受信トレイ/02確認待ち | AQMkAGE0ODE0MjMyLTNj
+受信トレイ/03今日 | AQMkAGE0ODE0MjMyLTNj
+受信トレイ/04会議・展示会 | AQMkAGE0ODE0MjMyLTNj
+受信トレイ/99保管 | AQMkAGE0ODE0MjMyLTNj

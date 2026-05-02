@@ -1,0 +1,23 @@
+{
+  "id": "conv-1776838986696-dobfau8vs",
+  "providerId": "claude",
+  "title": "ごきげんはいかがですか",
+  "titleGenerationStatus": "failed",
+  "createdAt": 1776838986696,
+  "updatedAt": 1776838991822,
+  "lastResponseAt": 1776838989895,
+  "sessionId": "43093888-566d-4d68-ab8a-9fdfbc3355fe",
+  "providerState": {
+    "providerSessionId": "43093888-566d-4d68-ab8a-9fdfbc3355fe"
+  },
+  "currentNote": "kyorindo-cx/01_strategy/CX_roadmap_20260416_v3.md",
+  "usage": {
+    "model": "sonnet",
+    "inputTokens": 0,
+    "cacheCreationInputTokens": 0,
+    "cacheReadInputTokens": 0,
+    "contextWindow": 200000,
+    "contextTokens": 0,
+    "percentage": 0
+  }
+}
