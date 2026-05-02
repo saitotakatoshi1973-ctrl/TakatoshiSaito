@@ -1,0 +1,641 @@
+# batch-inbox.md — フォルダ一括wiki化スキル
+
+## 概要
+
+指定フォルダのファイルを `processed-sources.yaml` と照合し、
+未処理・内容更新・部分失敗のファイルだけを `_inbox/` にコピーして wiki 化します。
+処理済みチェックにより、同じファイルを二重処理しません。
+
+---
+
+## 起動方法
+
+誤発動防止のため、呼びかけには必ず **「wiki」** を含めてください。
+
+| 呼びかけ例 | recursive | wiki_filter | 説明 |
+|-----------|-----------|-------------|------|
+| `「03_CX推進/01_戦略/ をwikiバッチ処理して」` | false | false | 直下のみ・全件 |
+| `「05_会議・経営/経営会議/ をwiki一括化して」` | false | false | 直下のみ・全件 |
+| `「03_CX推進/ をサブフォルダも含めてwikiバッチ処理して」` | true | false | 再帰・全件 |
+| `「01_IT/ をサブフォルダも含めてwikiバッチ処理して。wiki化価値があるものだけ対象にして」` | true | true | 再帰・LLM事前スクリーニング |
+| `「wiki batch 09_InformationOrganization/ --recursive --filter」` | true | true | 再帰・LLM事前スクリーニング |
+
+> ⚠️ 「バッチ処理して」「一括化して」など **「wiki」を含まない呼びかけは本スキルを起動しない**。
+
+### 入力パラメータ
+
+| パラメータ | 必須 | デフォルト | 説明 |
+|-----------|------|-----------|------|
+| `target_dir` | ✅ | — | 00personal 相対パス または 絶対パス |
+| `recursive` | — | `false` | サブフォルダも再帰的に処理するか |
+| `file_types` | — | `pptx,xlsx,pdf,md,txt` | 対象拡張子（カンマ区切り） |
+| `max_files` | — | `10` | 1回の処理上限件数（未処理+再処理の合計） |
+| `wiki_filter` | — | `false` | LLM事前スクリーニングで低価値ファイルを除外するか |
+| `wiki_score_threshold` | — | `6` | wiki_filter 有効時の採用スコア下限（0〜10） |
+
+---
+
+## 共通設定
+
+```python
+import os
+import re
+import yaml
+import hashlib
+import shutil
+import ctypes
+from datetime import date
+
+PERSONAL_ROOT  = r"C:\Users\takatoshi-saito\OneDrive\00personal"
+KB_ROOT        = r"C:\Users\takatoshi-saito\OneDrive\00personal\KnowledgeBase"
+INBOX_DIR      = os.path.join(KB_ROOT, "_inbox")
+PROCESSED_PATH = os.path.join(KB_ROOT, "_system", "processed-sources.yaml")
+
+# 除外フォルダパターン（personal-rules.md の searchable=false ルールに準拠）
+EXCLUDE_PATTERN = re.compile(
+    r"(^old$|^旧_|_nomal$|_仕掛$|_archive$|^アーカイブ$)",
+    re.IGNORECASE
+)
+DEFAULT_FILE_TYPES = {"pptx", "xlsx", "pdf", "md", "txt"}
+
+
+def is_cloud_only(path: str) -> bool:
+    """
+    OneDrive Files-on-Demand のクラウド専用ファイルかどうかを判定する。
+    ローカルにダウンロードされていないファイルは True を返す。
+    Windows 以外の環境では常に False を返す。
+    """
+    try:
+        FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS = 0x400000  # クラウド専用（要求時取得）
+        FILE_ATTRIBUTE_OFFLINE               = 0x1000   # オフライン（未ダウンロード）
+        attrs = ctypes.windll.kernel32.GetFileAttributesW(path)
+        if attrs == 0xFFFFFFFF:  # INVALID_FILE_ATTRIBUTES
+            return False
+        return bool(attrs & (FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS | FILE_ATTRIBUTE_OFFLINE))
+    except Exception:
+        return False  # 判定失敗時は処理対象として扱う
+```
+
+---
+
+## STEP 1: フォルダをスキャンする
+
+```python
+def scan_target_dir(
+    target_dir: str,
+    recursive: bool,
+    file_types: set[str],
+) -> dict:
+    """
+    target_dir を走査して対象ファイルのリストを返す。
+    - 除外パターンに合致するフォルダはスキップ。
+    - OneDrive クラウド専用ファイル（未ダウンロード）は cloud_only に分類。
+    - 最終更新日時の古い順で返す。
+
+    戻り値: {
+        "local":      list[str],  # ローカルにあるファイル（処理対象）
+        "cloud_only": list[str],  # クラウド専用のためスキップ
+    }
+    """
+    local      = []
+    cloud_only = []
+
+    if recursive:
+        for root, dirs, files in os.walk(target_dir):
+            dirs[:] = [d for d in dirs if not EXCLUDE_PATTERN.match(d)]
+            for fname in files:
+                ext = fname.rsplit(".", 1)[-1].lower() if "." in fname else ""
+                if ext in file_types:
+                    full = os.path.join(root, fname)
+                    if is_cloud_only(full):
+                        cloud_only.append(full)
+                    else:
+                        local.append(full)
+    else:
+        for entry in os.scandir(target_dir):
+            if entry.is_file():
+                ext = entry.name.rsplit(".", 1)[-1].lower() if "." in entry.name else ""
+                if ext in file_types:
+                    if is_cloud_only(entry.path):
+                        cloud_only.append(entry.path)
+                    else:
+                        local.append(entry.path)
+
+    # 最終更新日時の古い順（先に作成されたものを優先処理）
+    local.sort(key=lambda p: os.path.getmtime(p))
+    return {"local": local, "cloud_only": cloud_only}
+```
+
+---
+
+## STEP 1.5: wiki化価値をスクリーニングする（wiki_filter=true 時のみ）
+
+`wiki_filter=true` の場合、ファイル名とフォルダパスをもとに LLM が wiki 化価値を
+0〜10 でスコアリングし、`wiki_score_threshold`（デフォルト6）未満のファイルを除外する。
+
+### LLM へのスコアリング指示
+
+```
+以下のファイル一覧について、それぞれの「wikiナレッジとしての価値」を 0〜10 で評価してください。
+ファイル名とフォルダパスのみから判断します。
+
+【評価基準】
+高評価（7〜10）:
+  - 状況・一覧・台数・導入状況などの管理資料
+  - 戦略・方針・設計・仕様を記した資料
+  - 業界動向・競合情報・調査レポート
+  - 会議記録・進捗サマリー
+  - 現在も参照価値がある技術情報（構成図・アーキテクチャ等）
+  - 見積書・相見積（ベンダー比較・価格情報として価値あり）
+  - 発注書・納品書（調達履歴として価値あり）
+
+中評価（5〜6）:
+  - セットアップ手順書・運用マニュアル（現行機器・現行システムのもの）
+  - 比較的新しい（3年以内）の情報資料
+
+低評価（0〜4）:
+  - 古い機器のマニュアル・仕様書（製品マニュアルPDF単体）
+  - スキャンした申請書・承認書類（内容が読み取れないもの）
+  - 特売POP・フォームテンプレート・サイズ見本
+  - 設定値のみの技術PDFで文脈がないもの
+  - ファイル名から内容が明らかに低価値（img-xxxxxx.pdf 等）
+
+【ファイル一覧】
+{files をパスとともに列挙}
+
+【出力形式（YAML）】
+- path: "ファイル絶対パス"
+  score: 8
+  reason: "（1行で理由）"
+```
+
+### スクリーニング処理
+
+```python
+def pre_screen_wiki_value(
+    files: list[str],
+    score_threshold: int = 6,
+    batch_size: int = 30,
+) -> dict:
+    """
+    ファイルリストを LLM にスコアリングさせ、閾値以上のみ通す。
+    LLM トークン節約のため batch_size 件ずつ分割して処理する。
+
+    戻り値: {
+        "passed": list[str],   # 採用ファイル（score >= threshold）
+        "filtered": list[dict] # 除外ファイル（score, reason 付き）
+    }
+    """
+    passed   = []
+    filtered = []
+
+    for i in range(0, len(files), batch_size):
+        batch = files[i:i + batch_size]
+
+        # LLM にスコアリングを依頼
+        scores = llm_score_wiki_value(batch)   # 上記プロンプトで呼び出し
+
+        for item in scores:
+            if item["score"] >= score_threshold:
+                passed.append(item["path"])
+            else:
+                filtered.append(item)
+
+    return {"passed": passed, "filtered": filtered}
+```
+
+### スクリーニング結果の表示
+
+```
+🔍 wiki_filter スクリーニング結果
+
+スキャン: 72件 → ローカル: 68件 / ☁️クラウド専用スキップ: 4件
+         採用: 8件 / 除外: 60件
+
+【☁️クラウド専用スキップ（未ダウンロード）】
+  ☁️ 旧システム仕様書.pdf
+  ☁️ 他3件
+
+【採用（score ≥ 6）】
+  ✅ KP-20プリンタの状況説明資料2018.xlsx         [score: 8] 状況管理資料
+  ✅ ラベルプリンタ導入状況資料 2017.xlsx          [score: 7] 導入状況一覧
+  ✅ iPhone台数.xlsx                              [score: 8] 台数管理資料
+  ✅ TV会議システム5拠点202003.pdf                 [score: 7] システム構成情報
+  ✅ KP-30_データ変換の流れ.pptx                  [score: 8] 技術仕様・フロー説明
+  ✅ レジロール各店発注実績_20240703-20250328.xlsx  [score: 6] 実績データ（直近）
+  ✅ WebEX面会設定方法.pdf                        [score: 6] 現行システム手順書
+  ✅ TV会議システム2拠点.pdf                      [score: 6] システム構成情報
+
+【除外（score < 6）の主な理由】
+  ❌ 古いBHT操作マニュアル（5件）: 旧機器PDF
+  ❌ 特売POP_PDF（6件）: テンプレートPDF
+  ❌ img-xxxxxx.pdf 等（内容不明スキャンPDF）
+  ...
+
+採用した 8 件で処理を進めますか？
+```
+
+---
+
+## STEP 2: processed-sources.yaml と照合する
+
+```python
+def compute_file_hash(file_path: str) -> str:
+    """
+    ファイルの MD5 ハッシュを返す。
+    OneDrive Files-on-Demand でクラウド専用のファイルは読み取り失敗の可能性があるため、
+    失敗時は空文字列を返す（未処理扱いで続行）。
+    """
+    try:
+        h = hashlib.md5()
+        with open(file_path, "rb") as f:
+            for chunk in iter(lambda: f.read(65536), b""):
+                h.update(chunk)
+        return h.hexdigest()
+    except Exception:
+        return ""
+
+
+def load_processed_sources() -> dict[str, dict]:
+    """
+    processed-sources.yaml を読み込み、
+    source_path をキーとする辞書を返す。
+    ファイルが存在しない場合は空辞書を返す。
+    """
+    if not os.path.exists(PROCESSED_PATH):
+        return {}
+    try:
+        with open(PROCESSED_PATH, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f) or []
+        # リスト形式（コメントのみの場合 [] が返る）
+        if isinstance(data, list):
+            return {r["source_path"]: r for r in data if r and r.get("source_path")}
+        return {}
+    except Exception:
+        return {}
+
+
+def to_personal_relative(abs_path: str) -> str:
+    """絶対パスを 00personal/ 相対パスに変換する（スラッシュ区切り）"""
+    return os.path.relpath(abs_path, PERSONAL_ROOT).replace("\\", "/")
+
+
+def filter_files(files: list[str]) -> dict:
+    """
+    processed-sources.yaml と照合して以下に分類する:
+      new     : 未記録            → 処理対象
+      updated : ハッシュ変化       → 再処理対象（wikiを上書き更新）
+      partial : 部分失敗           → 再処理対象
+      done    : 完全成功済み       → スキップ
+
+    partial 判定条件:
+      - index_registered が False
+      - binary_moved が False（"skipped" は正常終了なので除外）
+    """
+    processed = load_processed_sources()
+    result = {"new": [], "updated": [], "partial": [], "done": []}
+
+    for abs_path in files:
+        rel_path = to_personal_relative(abs_path)
+        record   = processed.get(rel_path)
+
+        if record is None:
+            result["new"].append(abs_path)
+            continue
+
+        current_hash = compute_file_hash(abs_path)
+        stored_hash  = record.get("file_hash", "")
+
+        if stored_hash and current_hash and current_hash != stored_hash:
+            # ファイル内容が変化 → 再処理（wikiを最新内容で上書き）
+            result["updated"].append(abs_path)
+        elif (
+            not record.get("index_registered", False)
+            or record.get("binary_moved") is False
+        ):
+            # 部分失敗 → 再処理
+            result["partial"].append(abs_path)
+        else:
+            # 完全成功済み → スキップ
+            result["done"].append(abs_path)
+
+    return result
+```
+
+---
+
+## STEP 2.5: 削除されたソースファイルを検出する
+
+指定フォルダに関連する `processed-sources.yaml` のレコードのうち、
+現在のスキャン結果に存在しないものを「削除済み」として検出する。
+`source_deleted: true` 設定済みのレコードはスキップ（既知の削除）。
+
+```python
+def detect_deleted_sources(target_dir: str, current_files: list[str]) -> list[dict]:
+    """
+    target_dir 配下のレコードのうち、現在のスキャン結果に存在しないものを返す。
+    """
+    target_rel     = to_personal_relative(target_dir).rstrip("/")
+    processed      = load_processed_sources()
+    current_rel_set = {to_personal_relative(f) for f in current_files}
+
+    deleted = []
+    for source_path, record in processed.items():
+        # target_dir 配下のレコードのみ対象
+        if not source_path.startswith(target_rel + "/"):
+            continue
+        # 既知の削除はスキップ
+        if record.get("source_deleted", False):
+            continue
+        if source_path not in current_rel_set:
+            deleted.append(record)
+
+    return deleted
+```
+
+削除が検出された場合、**処理開始前に**ユーザーへ確認する：
+
+```
+⚠️ 削除されたソースファイルが見つかりました（{N}件）
+
+  {i}. {source_path}
+       → wiki: {wiki_path}
+
+これらのwikiをどうしますか？
+  A. wikiを削除する（change_log に記録）
+  B. status: outdated に更新して残す（推奨）
+  C. 何もしない（次回も同じ警告が出ます）
+A / B / C で回答してください:
+```
+
+| 選択 | wikiファイル | processed-sources.yaml |
+|------|------------|------------------------|
+| A. 削除 | ファイルを削除、index から除去 | レコードを削除 |
+| B. outdated更新 | Front-matterの `status: outdated` に変更 | `source_deleted: true` を追記 |
+| C. 何もしない | そのまま | `source_deleted: true` を追記（次回警告なし） |
+
+---
+
+## STEP 3: 処理予定をユーザーに提示・確認する
+
+```python
+def show_preview(
+    target_dir: str,
+    filtered: dict,
+    max_files: int,
+    screen_result: dict | None = None,
+) -> list[str]:
+    """
+    処理予定ファイルを表示してユーザーの確認を取る。
+    screen_result が渡された場合はスクリーニング統計も表示する。
+    確認後、処理対象の絶対パスリストを返す。
+    空リストはキャンセル。
+    """
+    # new / updated / partial を合わせて max_files 件まで
+    to_process = (
+        filtered["new"] + filtered["updated"] + filtered["partial"]
+    )[:max_files]
+
+    # スクリーニング統計（wiki_filter=True 時のみ表示）
+    filter_line = ""
+    if screen_result is not None:
+        total_scanned = len(screen_result["passed"]) + len(screen_result["filtered"])
+        filter_line = (
+            f"🔍 スクリーニング      :"
+            f" {total_scanned}件 → 採用{len(screen_result['passed'])}件"
+            f" / 除外{len(screen_result['filtered'])}件\n"
+        )
+
+    print(f"""
+📂 バッチ処理の準備ができました
+
+対象フォルダ: {to_personal_relative(target_dir)}
+────────────────────────────────
+{filter_line}🆕 未処理（新規）     : {len(filtered["new"])}件
+🔄 内容更新（再処理）  : {len(filtered["updated"])}件
+⚠️  部分失敗（再処理）  : {len(filtered["partial"])}件
+✅ 処理済み（スキップ） : {len(filtered["done"])}件
+────────────────────────────────
+今回処理する         : {len(to_process)}件（max_files={max_files}）
+
+【処理予定ファイル】""")
+
+    for i, f in enumerate(to_process, 1):
+        label = ""
+        if f in filtered["updated"]:
+            label = "（内容更新）"
+        elif f in filtered["partial"]:
+            label = "（再処理）"
+        print(f"  {i}. {os.path.basename(f)} {label}")
+
+    if not to_process:
+        print("\n処理対象ファイルはありません。")
+        return []
+
+    print(f"""
+進めますか？
+  1. 進める
+  2. 上限を変更する（現在: {max_files}件）
+  3. キャンセル""")
+
+    # ユーザーの回答に応じて to_process を返す（LLM がユーザー返答を読んで判定）
+    return to_process
+```
+
+---
+
+## STEP 4〜6: 処理実行
+
+```python
+def run_batch(to_process: list[str], filtered: dict) -> dict:
+    """
+    to_process の各ファイルを wiki 化する。1ファイルずつ直列で処理する。
+    """
+    results = []
+    skipped = []
+    errors  = []
+
+    for abs_path in to_process:
+        rel_path  = to_personal_relative(abs_path)
+        fname     = os.path.basename(abs_path)
+        file_hash = compute_file_hash(abs_path)
+
+        # STEP 4: _inbox/ にコピー（原本は 00personal/ に残したまま）
+        inbox_copy = _resolve_collision(os.path.join(INBOX_DIR, fname))
+        try:
+            shutil.copy2(abs_path, inbox_copy)
+        except Exception as e:
+            errors.append({"file": rel_path, "step": "copy", "error": str(e)})
+            continue
+
+        # STEP 5: inbox-agent のパイプラインを呼び出す
+        # place-wiki.md に batch-inbox 専用フィールドを渡すことで:
+        #   - route-binary.md をスキップ（元ファイルは既に 00personal/ にある）
+        #   - processed-sources.yaml に source_path を確定値で記録
+        pipeline_input = {
+            "file_path":              inbox_copy,
+            # ── batch-inbox 専用フィールド ──
+            "original_personal_path": rel_path,   # 00personal 相対パス（source_path の確定値）
+            "file_hash":              file_hash,   # MD5 ハッシュ
+            "skip_route_binary":      True,        # route-binary.md をスキップ
+        }
+
+        pipeline_result = run_inbox_pipeline(pipeline_input)
+        # ↑ convert-binary → analyze → write-wiki → place-wiki の順に実行
+
+        # STEP 6: _inbox/ のコピーを削除
+        try:
+            if os.path.exists(inbox_copy):
+                os.remove(inbox_copy)
+        except Exception:
+            pass   # 削除失敗は無視（次回実行時に削除される）
+
+        # 結果を記録
+        if pipeline_result.get("status") == "skip":
+            skipped.append({
+                "file":   rel_path,
+                "reason": pipeline_result.get("reason", "ユーザーがスキップを選択"),
+            })
+        elif pipeline_result.get("status") == "error":
+            errors.append({
+                "file":  rel_path,
+                "step":  "pipeline",
+                "error": pipeline_result.get("reason", "不明なエラー"),
+            })
+        else:
+            wiki_path = pipeline_result.get("wiki_path", "")
+            label = "（更新）" if abs_path in filtered.get("updated", []) else ""
+            results.append({"file": rel_path, "wiki_path": wiki_path, "label": label})
+
+    return {
+        "status":       "success" if not errors else "partial",
+        "processed":    len(results),
+        "skipped":      len(skipped),
+        "errors":       len(errors),
+        "results":      results,
+        "skipped_list": skipped,
+        "error_list":   errors,
+    }
+
+
+def _resolve_collision(dest_path: str) -> str:
+    """同名ファイルが _inbox/ に存在する場合 _v2/_v3 を付与する"""
+    if not os.path.exists(dest_path):
+        return dest_path
+    base, ext = os.path.splitext(dest_path)
+    version = 2
+    while os.path.exists(f"{base}_v{version}{ext}"):
+        version += 1
+    return f"{base}_v{version}{ext}"
+```
+
+---
+
+## STEP 7: 完了レポートを出力する
+
+```
+✅ バッチ処理完了
+
+対象フォルダ: 03_CX推進/01_戦略/
+────────────────────────────
+処理成功:      7件
+内容更新:      1件（wiki を上書き更新）
+スキップ:      1件（ユーザーが分類確認でスキップ）
+エラー:        1件
+────────────────────────────
+【処理済みファイル】
+  ✅ CX戦略2026_v3.pptx → kyorindo/cx/strategy/CX戦略2026_20260502.md
+  🔄 ロードマップ_20260416.pptx → kyorindo/cx/strategy/CX_roadmap_20260416.md（更新）
+  ...
+
+【スキップ】
+  ⏭️ CX方針メモ.txt → ユーザーがスキップを選択
+
+【エラー（手動確認）】
+  ❌ 旧_CX方針.pptx → convert-binary 失敗（パスワード保護の可能性）
+
+次回「wikiバッチ処理して」で同じフォルダを指定すると、未処理・更新されたファイルのみ対象になります。
+処理状態: KnowledgeBase/_system/processed-sources.yaml
+```
+
+---
+
+## メイン実行フロー
+
+```python
+def run(
+    target_dir: str,
+    recursive: bool      = False,
+    file_types: set[str] = DEFAULT_FILE_TYPES,
+    max_files: int        = 10,
+    wiki_filter: bool     = False,
+    wiki_score_threshold: int = 6,
+) -> dict:
+    # 絶対パスに正規化
+    if not os.path.isabs(target_dir):
+        target_dir = os.path.join(PERSONAL_ROOT, target_dir)
+
+    if not os.path.isdir(target_dir):
+        return {"status": "error", "message": f"フォルダが見つかりません: {target_dir}"}
+
+    # STEP 1: スキャン（クラウド専用ファイルは自動スキップ）
+    scan_result = scan_target_dir(target_dir, recursive, file_types)
+    all_files   = scan_result["local"]       # ローカルにあるファイルのみ処理対象
+    cloud_skipped = scan_result["cloud_only"]  # ☁️ クラウド専用スキップ件数（ログ用）
+
+    if cloud_skipped:
+        print(f"☁️ クラウド専用スキップ: {len(cloud_skipped)}件（未ダウンロード）")
+
+    # STEP 1.5: wiki_filter=True の場合は LLM スクリーニング
+    screen_result = None
+    if wiki_filter and all_files:
+        screen_result = pre_screen_wiki_value(all_files, wiki_score_threshold)
+        all_files = screen_result["passed"]   # 採用ファイルのみ以降の処理へ
+
+    # STEP 2.5: 削除検出 → ユーザー確認
+    deleted = detect_deleted_sources(target_dir, all_files)
+    if deleted:
+        handle_deleted_sources(deleted)   # ユーザーに A/B/C を確認して処理
+
+    # STEP 2: 未処理フィルタ
+    filtered = filter_files(all_files)
+
+    # STEP 3: プレビュー・確認（スクリーニング結果も合わせて表示）
+    to_process = show_preview(target_dir, filtered, max_files, screen_result)
+    if not to_process:
+        return {"status": "cancelled", "message": "処理をキャンセルしました"}
+
+    # STEP 4〜6: 処理実行
+    return run_batch(to_process, filtered)
+```
+
+---
+
+## エラーハンドリング
+
+| 発生箇所 | 対処 |
+|---------|------|
+| フォルダが存在しない | エラーを返してスキップ |
+| **OneDriveクラウド専用ファイル（未ダウンロード）** | **STEP 1 で `cloud_only` に分類し処理対象外とする（スキップ）** |
+| ハッシュ計算失敗（その他 I/O エラー） | 空文字として未処理扱いで続行 |
+| _inbox/ へのコピー失敗 | エラーリストに記録してスキップ |
+| パイプライン処理失敗 | エラーリストに記録。_inbox コピーは削除 |
+| processed-sources.yaml 読み込み失敗 | 空辞書として続行（全ファイルを新規扱い）|
+| processed-sources.yaml 書き込み失敗 | 5秒×3回リトライ → 失敗時は警告のみ |
+
+---
+
+## 呼び出し先スキル
+
+```
+batch-inbox.md（ユーザー起動）
+    ├─ _inbox/ にコピー
+    └─→ convert-binary.md       （テキスト抽出）
+        └─→ analyze.md          （分類判定）
+            └─→ write-wiki.md   （wiki生成）
+                └─→ place-wiki.md（後処理 / skip_route_binary=True）
+                        ├─→ update-overview.md
+                        ├─→ change_log に記録
+                        ├─→ index-builder.md（add）
+                        └─→ processed-sources.yaml に記録
+```

@@ -1,0 +1,291 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1145" viewBox="0 0 1600 1145"
+     font-family="'Segoe UI',Arial,sans-serif">
+<defs>
+  <marker id="a"  markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#475569"/></marker>
+  <marker id="ad" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#a78bfa"/></marker>
+  <marker id="ao" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#ea580c"/></marker>
+  <marker id="am" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#92400e"/></marker>
+</defs>
+
+<rect width="1600" height="1145" fill="#f1f5f9"/>
+
+<!-- ===== TOP SECTION ===== -->
+<rect x="10" y="10" width="1580" height="555" rx="12" fill="#eff6ff" stroke="#93c5fd" stroke-width="1.5"/>
+<text x="800" y="35" text-anchor="middle" font-size="14" font-weight="bold" fill="#1e40af">📥  inbox-agent フロー</text>
+
+<!-- ===== BOTTOM SECTION ===== -->
+<rect x="10" y="578" width="1580" height="478" rx="12" fill="#fff7ed" stroke="#fdba74" stroke-width="1.5"/>
+<text x="800" y="601" text-anchor="middle" font-size="14" font-weight="bold" fill="#9a3412">🔧  maintenance-agent フロー</text>
+
+<!-- ============================================================ -->
+<!--  TOP SECTION  cols 1-4 (cx: 150, 410, 670, 930)              -->
+<!--  col positions: c1=69  c2=329  c3=589  c4=849                -->
+<!-- ============================================================ -->
+
+<!-- User trigger (center x=540) -->
+<rect x="400" y="46" width="280" height="30" rx="6" fill="#dbeafe" stroke="#93c5fd"/>
+<text x="540" y="65" text-anchor="middle" font-size="11" fill="#1e40af">👤  ファイルを _inbox/ に投入</text>
+<line x1="540" y1="76" x2="540" y2="86" stroke="#475569" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- inbox-agent -->
+<rect x="330" y="86" width="420" height="54" rx="8" fill="#1e3a8a"/>
+<text x="540" y="109" text-anchor="middle" font-size="12" fill="white" font-weight="bold">🤖  inbox-agent.md</text>
+<text x="540" y="127" text-anchor="middle" font-size="10" fill="#93c5fd">「inbox処理して」で起動 → 1ファイルずつ順番に処理</text>
+
+<!-- inbox-agent → ① (down → left elbow → down) -->
+<path d="M450,140 L450,164 L150,164 L150,178" fill="none" stroke="#475569" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- ▌ Pipeline label -->
+<text x="69" y="172" font-size="10" fill="#475569" font-weight="bold">▌ コアパイプライン</text>
+
+<!-- Pipeline boxes y=178 h=55 -->
+<rect x="69"  y="178" width="162" height="55" rx="7" fill="#1d4ed8"/>
+<text x="150" y="201" text-anchor="middle" font-size="10.5" fill="white" font-weight="bold">① convert-binary.md</text>
+<text x="150" y="217" text-anchor="middle" font-size="9"    fill="#bfdbfe">テキスト抽出・URL取得</text>
+
+<rect x="329" y="178" width="162" height="55" rx="7" fill="#1d4ed8"/>
+<text x="410" y="201" text-anchor="middle" font-size="10.5" fill="white" font-weight="bold">② analyze.md</text>
+<text x="410" y="217" text-anchor="middle" font-size="9"    fill="#bfdbfe">分類・wiki_type・信頼度判定</text>
+
+<rect x="589" y="178" width="162" height="55" rx="7" fill="#1d4ed8"/>
+<text x="670" y="201" text-anchor="middle" font-size="10.5" fill="white" font-weight="bold">③ write-wiki.md</text>
+<text x="670" y="217" text-anchor="middle" font-size="9"    fill="#bfdbfe">wiki Markdown 生成・保存</text>
+
+<rect x="849" y="178" width="162" height="55" rx="7" fill="#1d4ed8"/>
+<text x="930" y="201" text-anchor="middle" font-size="10.5" fill="white" font-weight="bold">④ place-wiki.md</text>
+<text x="930" y="217" text-anchor="middle" font-size="9"    fill="#bfdbfe">後処理オーケストレーター</text>
+
+<!-- pipeline → arrows -->
+<line x1="231" y1="205" x2="329" y2="205" stroke="#60a5fa" stroke-width="2" marker-end="url(#a)"/>
+<line x1="491" y1="205" x2="589" y2="205" stroke="#60a5fa" stroke-width="2" marker-end="url(#a)"/>
+<line x1="751" y1="205" x2="849" y2="205" stroke="#60a5fa" stroke-width="2" marker-end="url(#a)"/>
+
+<!-- ▌ Post-proc label -->
+<text x="69" y="272" font-size="10" fill="#475569" font-weight="bold">▌ 後処理スキル（place-wiki が呼び出す）</text>
+
+<!-- post-proc bus: place-wiki bottom → y=281 → drops -->
+<line x1="930" y1="233" x2="930" y2="281" stroke="#475569" stroke-width="1.5"/>
+<line x1="150" y1="281" x2="930" y2="281" stroke="#475569" stroke-width="1.5"/>
+<line x1="150" y1="281" x2="150" y2="294" stroke="#475569" stroke-width="1.5" marker-end="url(#a)"/>
+<line x1="670" y1="281" x2="670" y2="294" stroke="#475569" stroke-width="1.5" marker-end="url(#a)"/>
+<line x1="930" y1="281" x2="930" y2="294" stroke="#475569" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- Post-proc boxes y=294 h=55 -->
+<rect x="69"  y="294" width="162" height="55" rx="7" fill="#15803d"/>
+<text x="150" y="317" text-anchor="middle" font-size="10.5" fill="white" font-weight="bold">route-binary.md</text>
+<text x="150" y="333" text-anchor="middle" font-size="9"    fill="#bbf7d0">→ 00personal/ へ移動</text>
+
+<rect x="589" y="294" width="162" height="55" rx="7" fill="#15803d"/>
+<text x="670" y="317" text-anchor="middle" font-size="10.5" fill="white" font-weight="bold">update-overview.md</text>
+<text x="670" y="333" text-anchor="middle" font-size="9"    fill="#bbf7d0">_overview.md 更新</text>
+
+<rect x="849" y="294" width="162" height="55" rx="7" fill="#15803d"/>
+<text x="930" y="317" text-anchor="middle" font-size="10.5" fill="white" font-weight="bold">index-builder.md (add)</text>
+<text x="930" y="333" text-anchor="middle" font-size="9"    fill="#bbf7d0">ベクトルindex 1件追加</text>
+
+<!-- ▌ Learning label -->
+<text x="69" y="382" font-size="10" fill="#475569" font-weight="bold">▌ 学習ループ（フィードバック → ルール蓄積）</text>
+
+<!-- route-binary → record-feedback (straight down) -->
+<line x1="150" y1="349" x2="150" y2="394" stroke="#475569" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- 信頼度<6 arrow: exits LEFT of analyze → far-left margin → down → enters record-feedback top -->
+<!-- Route: analyze left (329,205) → left to x=30 → down to y=256 then hop label then continue → y=390 → right to 150 → record-feedback top -->
+<path d="M329,205 L30,205 L30,256 L30,391 L150,391 L150,394" fill="none" stroke="#a78bfa" stroke-width="1.3" stroke-dasharray="5,3" marker-end="url(#ad)"/>
+<!-- label near horizontal turn, above learning section -->
+<rect x="34" y="258" width="158" height="16" rx="4" fill="#ede9fe" opacity="0.9"/>
+<text x="113" y="269" text-anchor="middle" font-size="8.5" fill="#5b21b6">信頼度 &lt;6 のとき記録</text>
+
+<!-- Learning boxes y=394 h=55 -->
+<rect x="69"  y="394" width="162" height="55" rx="7" fill="#6d28d9"/>
+<text x="150" y="417" text-anchor="middle" font-size="10.5" fill="white" font-weight="bold">record-feedback.md</text>
+<text x="150" y="433" text-anchor="middle" font-size="9"    fill="#ddd6fe">修正を即時記録</text>
+
+<rect x="329" y="394" width="162" height="55" rx="7" fill="#1e293b"/>
+<text x="410" y="417" text-anchor="middle" font-size="10.5" fill="white" font-weight="bold">📄 feedback-log.md</text>
+<text x="410" y="433" text-anchor="middle" font-size="9"    fill="#94a3b8">修正履歴蓄積</text>
+
+<rect x="589" y="394" width="162" height="55" rx="7" fill="#6d28d9"/>
+<text x="670" y="417" text-anchor="middle" font-size="10.5" fill="white" font-weight="bold">learn-from-feedback.md</text>
+<text x="670" y="433" text-anchor="middle" font-size="9"    fill="#ddd6fe">ルール抽出・提案</text>
+
+<rect x="849" y="394" width="162" height="55" rx="7" fill="#1e293b"/>
+<text x="930" y="417" text-anchor="middle" font-size="10.5" fill="white" font-weight="bold">📄 classification-hints.md</text>
+<text x="930" y="433" text-anchor="middle" font-size="9"    fill="#94a3b8">分類ルール蓄積</text>
+
+<!-- learning arrows -->
+<line x1="231" y1="421" x2="329" y2="421" stroke="#475569" stroke-width="1.5" marker-end="url(#a)"/>
+<line x1="491" y1="421" x2="589" y2="421" stroke="#475569" stroke-width="1.5" marker-end="url(#a)"/>
+<line x1="751" y1="421" x2="849" y2="421" stroke="#475569" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- ルール参照: exit RIGHT of classification-hints → far-right → up → enters analyze right side -->
+<!-- Route: (1011,421) → x=1075 → y=205 → analyze right (491,205) -->
+<path d="M1011,421 L1075,421 L1075,205 L491,205" fill="none" stroke="#a78bfa" stroke-width="1.3" stroke-dasharray="5,3" marker-end="url(#ad)"/>
+<rect x="870" y="194" width="90" height="16" rx="4" fill="#ede9fe" opacity="0.9"/>
+<text x="915" y="205" text-anchor="middle" font-size="8.5" fill="#5b21b6">ルール参照</text>
+
+<!-- ▌ Data stores (top) label -->
+<text x="69" y="488" font-size="10" fill="#475569" font-weight="bold">▌ データストア</text>
+
+<!-- Data store boxes y=498 h=40 -->
+<rect x="69"  y="498" width="162" height="40" rx="6" fill="#0f172a"/>
+<text x="150" y="515" text-anchor="middle" font-size="9.5" fill="white" font-weight="bold">🗄 _overview.md（各フォルダ）</text>
+<text x="150" y="530" text-anchor="middle" font-size="8"   fill="#94a3b8">フォルダ概要</text>
+
+<rect x="329" y="498" width="162" height="40" rx="6" fill="#0f172a"/>
+<text x="410" y="515" text-anchor="middle" font-size="9.5" fill="white" font-weight="bold">🗄 change_log_YYYY-MM.md</text>
+<text x="410" y="530" text-anchor="middle" font-size="8"   fill="#94a3b8">月次変更履歴</text>
+
+<rect x="589" y="498" width="162" height="40" rx="6" fill="#0f172a"/>
+<text x="670" y="515" text-anchor="middle" font-size="9.5" fill="white" font-weight="bold">🗄 personal-index.yaml</text>
+<text x="670" y="530" text-anchor="middle" font-size="8"   fill="#94a3b8">00personal/ フォルダ索引</text>
+
+<rect x="849" y="498" width="162" height="40" rx="6" fill="#0f172a"/>
+<text x="930" y="515" text-anchor="middle" font-size="9.5" fill="white" font-weight="bold">🗄 wiki-embeddings.npz</text>
+<text x="930" y="530" text-anchor="middle" font-size="8"   fill="#94a3b8">ベクトルindex</text>
+
+<!-- dashed writes (top) -->
+<line x1="670" y1="349" x2="670" y2="498" stroke="#475569" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#a)"/>
+<line x1="930" y1="349" x2="930" y2="498" stroke="#475569" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#a)"/>
+
+<!-- ============================================================ -->
+<!--  BOTTOM SECTION  all 6 cols (cx: 150,410,670,930,1190,1450)  -->
+<!--  col positions: c1=69  c2=329  c3=589  c4=849  c5=1109  c6=1369 -->
+<!-- ============================================================ -->
+
+<!-- User trigger (center x=800) -->
+<rect x="640" y="609" width="320" height="30" rx="6" fill="#fed7aa" stroke="#fdba74"/>
+<text x="800" y="628" text-anchor="middle" font-size="11" fill="#9a3412">👤  「wiki週次/月次メンテナンス実行」</text>
+<line x1="800" y1="639" x2="800" y2="650" stroke="#475569" stroke-width="1.5" marker-end="url(#a)"/>
+
+<!-- maintenance-agent -->
+<rect x="540" y="650" width="520" height="54" rx="8" fill="#7c2d12"/>
+<text x="800" y="673" text-anchor="middle" font-size="12" fill="white" font-weight="bold">🤖  maintenance-agent.md</text>
+<text x="800" y="691" text-anchor="middle" font-size="10" fill="#fdba74">週次タスク 5 件 → 月次タスク 2 件を順番に実行</text>
+
+<!-- stem → weekly bus -->
+<line x1="800" y1="704" x2="800" y2="730" stroke="#ea580c" stroke-width="2.5"/>
+
+<!-- Weekly bus (y=730, cx1=150 to cx6=1450) -->
+<line x1="150" y1="730" x2="1450" y2="730" stroke="#ea580c" stroke-width="2.5"/>
+
+<!-- 週次 label tag -->
+<rect x="69" y="718" width="56" height="20" rx="4" fill="#b45309"/>
+<text x="97" y="732" text-anchor="middle" font-size="9.5" fill="white" font-weight="bold">週 次</text>
+
+<!-- Weekly drops y=730→752 (22px) -->
+<line x1="150"  y1="730" x2="150"  y2="752" stroke="#ea580c" stroke-width="2" marker-end="url(#ao)"/>
+<line x1="410"  y1="730" x2="410"  y2="752" stroke="#ea580c" stroke-width="2" marker-end="url(#ao)"/>
+<line x1="670"  y1="730" x2="670"  y2="752" stroke="#ea580c" stroke-width="2" marker-end="url(#ao)"/>
+<line x1="930"  y1="730" x2="930"  y2="752" stroke="#ea580c" stroke-width="2" marker-end="url(#ao)"/>
+<line x1="1190" y1="730" x2="1190" y2="752" stroke="#ea580c" stroke-width="2" marker-end="url(#ao)"/>
+<line x1="1450" y1="730" x2="1450" y2="752" stroke="#ea580c" stroke-width="2" marker-end="url(#ao)"/>
+
+<!-- Weekly boxes y=752 h=55 -->
+<rect x="69"   y="752" width="162" height="55" rx="7" fill="#b45309"/>
+<text x="150"  y="775" text-anchor="middle" font-size="10.5" fill="white" font-weight="bold">index-builder.md</text>
+<text x="150"  y="791" text-anchor="middle" font-size="9"    fill="#fde68a">(rebuild) 全件再構築</text>
+
+<rect x="329"  y="752" width="162" height="55" rx="7" fill="#b45309"/>
+<text x="410"  y="775" text-anchor="middle" font-size="10.5" fill="white" font-weight="bold">update-overview.md</text>
+<text x="410"  y="791" text-anchor="middle" font-size="9"    fill="#fde68a">(ALL) 全フォルダ更新</text>
+
+<rect x="589"  y="752" width="162" height="55" rx="7" fill="#b45309"/>
+<text x="670"  y="775" text-anchor="middle" font-size="10.5" fill="white" font-weight="bold">sync-personal.md</text>
+<text x="670"  y="791" text-anchor="middle" font-size="9"    fill="#fde68a">00personal/ フォルダ同期</text>
+
+<rect x="849"  y="752" width="162" height="55" rx="7" fill="#b45309"/>
+<text x="930"  y="775" text-anchor="middle" font-size="10.5" fill="white" font-weight="bold">sync-wiki.md</text>
+<text x="930"  y="791" text-anchor="middle" font-size="9"    fill="#fde68a">直接追加ファイル検知</text>
+
+<rect x="1109" y="752" width="162" height="55" rx="7" fill="#b45309"/>
+<text x="1190" y="775" text-anchor="middle" font-size="10.5" fill="white" font-weight="bold">check-integrity.md</text>
+<text x="1190" y="791" text-anchor="middle" font-size="9"    fill="#fde68a">FM欠落・未登録を自動修正</text>
+
+<rect x="1369" y="752" width="162" height="55" rx="7" fill="#0e7490"/>
+<text x="1450" y="775" text-anchor="middle" font-size="10.5" fill="white" font-weight="bold">web-search.md</text>
+<text x="1450" y="791" text-anchor="middle" font-size="9"    fill="#a5f3fc">Web検索 → wiki 自動生成</text>
+
+<rect x="1369" y="812" width="162" height="17" rx="4" fill="#164e63" opacity="0.9"/>
+<text x="1450" y="824" text-anchor="middle" font-size="8.5" fill="#e0f2fe">→ ③ write-wiki.md を呼び出す</text>
+
+<!-- Monthly bus: exit right side of maint-agent (x=1060, y=677) → right to x=1572 → down to y=858 → left to cx1=150 -->
+<path d="M1060,677 L1572,677 L1572,858 L150,858" fill="none" stroke="#92400e" stroke-width="2" stroke-dasharray="8,4"/>
+
+<!-- Monthly drops y=858→878 (20px) -->
+<line x1="150" y1="858" x2="150" y2="878" stroke="#92400e" stroke-width="2" marker-end="url(#am)"/>
+<line x1="410" y1="858" x2="410" y2="878" stroke="#92400e" stroke-width="2" marker-end="url(#am)"/>
+
+<!-- 月次 label tag -->
+<rect x="69" y="846" width="56" height="20" rx="4" fill="#7c2d12"/>
+<text x="97" y="860" text-anchor="middle" font-size="9.5" fill="white" font-weight="bold">月 次</text>
+
+<!-- Monthly boxes y=878 h=55 -->
+<rect x="69"  y="878" width="162" height="55" rx="7" fill="#92400e"/>
+<text x="150" y="901" text-anchor="middle" font-size="10.5" fill="white" font-weight="bold">update-changelog.md</text>
+<text x="150" y="917" text-anchor="middle" font-size="9"    fill="#fde68a">月次ログ圧縮 → 年次化</text>
+
+<rect x="329" y="878" width="162" height="55" rx="7" fill="#6d28d9"/>
+<text x="410" y="901" text-anchor="middle" font-size="10.5" fill="white" font-weight="bold">learn-from-feedback.md</text>
+<text x="410" y="917" text-anchor="middle" font-size="9"    fill="#ddd6fe">フィードバック学習・ルール提案</text>
+
+<!-- ▌ Data stores (bottom) label -->
+<text x="69" y="968" font-size="10" fill="#475569" font-weight="bold">▌ データストア</text>
+
+<!-- Data store boxes y=978 h=40 -->
+<rect x="69"   y="978" width="162" height="40" rx="6" fill="#0f172a"/>
+<text x="150"  y="995" text-anchor="middle" font-size="9.5" fill="white" font-weight="bold">🗄 wiki-embeddings.npz</text>
+<text x="150"  y="1009" text-anchor="middle" font-size="8"  fill="#94a3b8">ベクトルindex（全件再構築）</text>
+
+<rect x="329"  y="978" width="162" height="40" rx="6" fill="#0f172a"/>
+<text x="410"  y="995" text-anchor="middle" font-size="9.5" fill="white" font-weight="bold">🗄 personal-index.yaml</text>
+<text x="410"  y="1009" text-anchor="middle" font-size="8"  fill="#94a3b8">00personal/ フォルダ索引</text>
+
+<rect x="589"  y="978" width="162" height="40" rx="6" fill="#0f172a"/>
+<text x="670"  y="995" text-anchor="middle" font-size="9.5" fill="white" font-weight="bold">🗄 change_log_YYYY.md</text>
+<text x="670"  y="1009" text-anchor="middle" font-size="8"  fill="#94a3b8">年次変更履歴</text>
+
+<rect x="849"  y="978" width="162" height="40" rx="6" fill="#0f172a"/>
+<text x="930"  y="995" text-anchor="middle" font-size="9.5" fill="white" font-weight="bold">🗄 integrity-report.md</text>
+<text x="930"  y="1009" text-anchor="middle" font-size="8"  fill="#94a3b8">整合性チェック結果</text>
+
+<rect x="1109" y="978" width="162" height="40" rx="6" fill="#0f172a"/>
+<text x="1190" y="995" text-anchor="middle" font-size="9.5" fill="white" font-weight="bold">🗄 maintenance-log.md</text>
+<text x="1190" y="1009" text-anchor="middle" font-size="8"  fill="#94a3b8">実行履歴（直近3ヶ月）</text>
+
+<!-- dashed writes (bottom) -->
+<line x1="150"  y1="807" x2="150"  y2="978" stroke="#475569" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#a)"/>
+<line x1="670"  y1="807" x2="410"  y2="978" stroke="#475569" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#a)"/>
+<line x1="150"  y1="933" x2="670"  y2="978" stroke="#475569" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#a)"/>
+<line x1="1190" y1="807" x2="930"  y2="978" stroke="#475569" stroke-width="1" stroke-dasharray="3,2" marker-end="url(#a)"/>
+
+<!-- ============================================================ -->
+<!--  LEGEND                                                       -->
+<!-- ============================================================ -->
+<rect x="10" y="1078" width="1580" height="57" rx="8" fill="#f8fafc" stroke="#e2e8f0"/>
+
+<rect x="28"   y="1089" width="13" height="13" rx="3" fill="#1e3a8a"/>
+<text x="47"   y="1099" font-size="10" fill="#334155">エージェント</text>
+<rect x="148"  y="1089" width="13" height="13" rx="3" fill="#1d4ed8"/>
+<text x="167"  y="1099" font-size="10" fill="#334155">コアパイプライン</text>
+<rect x="292"  y="1089" width="13" height="13" rx="3" fill="#15803d"/>
+<text x="311"  y="1099" font-size="10" fill="#334155">後処理スキル</text>
+<rect x="412"  y="1089" width="13" height="13" rx="3" fill="#6d28d9"/>
+<text x="431"  y="1099" font-size="10" fill="#334155">学習スキル</text>
+<rect x="510"  y="1089" width="13" height="13" rx="3" fill="#b45309"/>
+<text x="529"  y="1099" font-size="10" fill="#334155">週次メンテナンス</text>
+<rect x="644"  y="1089" width="13" height="13" rx="3" fill="#92400e"/>
+<text x="663"  y="1099" font-size="10" fill="#334155">月次メンテナンス</text>
+<rect x="778"  y="1089" width="13" height="13" rx="3" fill="#0e7490"/>
+<text x="797"  y="1099" font-size="10" fill="#334155">web-search</text>
+<rect x="878"  y="1089" width="13" height="13" rx="3" fill="#0f172a"/>
+<text x="897"  y="1099" font-size="10" fill="#334155">データストア</text>
+<line x1="990"  y1="1095" x2="1030" y2="1095" stroke="#475569" stroke-width="2"   marker-end="url(#a)"/>
+<text x="1038"  y="1099" font-size="10" fill="#334155">呼び出し</text>
+<line x1="1115" y1="1095" x2="1155" y2="1095" stroke="#a78bfa"  stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#ad)"/>
+<text x="1163"  y="1099" font-size="10" fill="#334155">条件付き / 参照</text>
+<line x1="1278" y1="1095" x2="1318" y2="1095" stroke="#92400e"  stroke-width="2"   stroke-dasharray="8,4" marker-end="url(#am)"/>
+<text x="1326"  y="1099" font-size="10" fill="#334155">月次バス（迂回ルーティング）</text>
+
+<text x="28" y="1124" font-size="9" fill="#64748b">※ index-builder.md は add（1件追加: place-wiki / sync-wiki / check-integrity から呼び出し）と rebuild（全件: maintenance 週次）の 2 モードを持ちます</text>
+</svg>
