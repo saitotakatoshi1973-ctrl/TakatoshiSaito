@@ -52,7 +52,14 @@
       "Bash(printf '%s\\\\n' 'x = []' 'L=x.append' 'L\\(\"\"\"\".task-list li::before { content: \\\\\"\"\"\"\\\\\\\\u25cb\\\\\"\"\"\"; }\"\"\"\"\\)' 'print\\(repr\\(x[0]\\)\\)')",
       "Bash(python3 -c \"print\\(pathlib.Path\\(''''C:/Users/takatoshi-saito/AppData/Local/Temp/test_enc.txt''''\\).read_text\\(encoding=''''utf-8''''\\)\\)\")",
       "Bash(printf '%s' 'import os:*)",
-      "Bash(python -c \"import sys; sys.stdout.buffer.write\\(sys.stdin.buffer.read\\(\\)\\)\" type C:Userstakatoshi-saitoOneDrive00personalClaudeCodeFolderkyorindo-cx07_deliverablesagenda_v2_text.txt)"
+      "Bash(python -c \"import sys; sys.stdout.buffer.write\\(sys.stdin.buffer.read\\(\\)\\)\" type C:Userstakatoshi-saitoOneDrive00personalClaudeCodeFolderkyorindo-cx07_deliverablesagenda_v2_text.txt)",
+      "Bash(git -C \"C:\\\\Users\\\\takatoshi-saito\\\\OneDrive\\\\00personal\\\\ClaudeCodeFolder\\\\.claude\\\\worktrees\\\\sharp-mcclintock-c0cbc1\" status)",
+      "Bash(git -C \"C:\\\\Users\\\\takatoshi-saito\\\\OneDrive\\\\00personal\\\\ClaudeCodeFolder\\\\.claude\\\\worktrees\\\\sharp-mcclintock-c0cbc1\" log --oneline -5)",
+      "Bash(git -C \"C:\\\\Users\\\\takatoshi-saito\\\\OneDrive\\\\00personal\\\\ClaudeCodeFolder\\\\.claude\\\\worktrees\\\\sharp-mcclintock-c0cbc1\" diff .claude/settings.local.json)",
+      "Bash(git -C \"C:\\\\Users\\\\takatoshi-saito\\\\OneDrive\\\\00personal\\\\ClaudeCodeFolder\\\\.claude\\\\worktrees\\\\sharp-mcclintock-c0cbc1\" diff --stat)",
+      "Bash(git -C \"C:\\\\Users\\\\takatoshi-saito\\\\OneDrive\\\\00personal\\\\ClaudeCodeFolder\\\\.claude\\\\worktrees\\\\sharp-mcclintock-c0cbc1\" log main..HEAD --oneline)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }
