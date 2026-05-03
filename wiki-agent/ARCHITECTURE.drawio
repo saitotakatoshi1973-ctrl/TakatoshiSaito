@@ -1,6 +1,6 @@
 <mxfile host="Electron">
   <diagram id="ZvFt84sp1zSPN49LmZjE" name="ページ-1">
-    <mxGraphModel dx="1631" dy="1263" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="1700" pageHeight="1300" math="0" shadow="0">
+    <mxGraphModel dx="1574" dy="1184" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="1700" pageHeight="1300" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
@@ -17,7 +17,7 @@
           <mxGeometry height="26" width="360" x="620" y="593" as="geometry" />
         </mxCell>
         <mxCell id="lbl-pipeline" parent="1" style="text;html=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=1;fontColor=#475569;align=left;" value="▌ コアパイプライン" vertex="1">
-          <mxGeometry height="16" width="180" x="333" y="168" as="geometry" />
+          <mxGeometry height="16" width="180" x="333" y="166" as="geometry" />
         </mxCell>
         <mxCell id="lbl-postproc" parent="1" style="text;html=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=1;fontColor=#475569;align=left;" value="▌ 後処理スキル（place-wiki が呼び出す）" vertex="1">
           <mxGeometry height="16" width="320" x="333" y="276" as="geometry" />
@@ -256,6 +256,9 @@
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
         <mxCell id="e-w5dsb4" edge="1" parent="1" source="w5" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#475569;strokeWidth=1;dashed=1;dashPattern=3 2;" target="dsb4" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="9yPEZhbCCvKhLCYej7RN-1" edge="1" parent="1" source="lbl-pipeline" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.25;exitY=1;exitDx=0;exitDy=0;entryX=0.25;entryY=0;entryDx=0;entryDy=0;" target="lbl-pipeline">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
       </root>

@@ -30,15 +30,17 @@
       "enableBangBash": false,
       "enableOpus1M": false,
       "enableSonnet1M": false,
+      "customModels": "",
       "lastModel": "sonnet",
-      "environmentVariables": "",
+      "environmentVariables": "ANTHROPIC_API_KEY=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",
       "environmentHash": ""
     },
     "codex": {
-      "enabled": false,
+      "enabled": true,
       "safeMode": "workspace-write",
       "cliPath": "",
       "cliPathsByHost": {},
+      "customModels": "",
       "reasoningSummary": "detailed",
       "environmentVariables": "",
       "environmentHash": "",
@@ -49,10 +51,19 @@
     }
   },
   "settingsProvider": "claude",
-  "savedProviderModel": {},
-  "savedProviderEffort": {},
+  "savedProviderModel": {
+    "claude": "sonnet"
+  },
+  "savedProviderEffort": {
+    "claude": "high"
+  },
   "savedProviderServiceTier": {},
-  "savedProviderThinkingBudget": {},
+  "savedProviderThinkingBudget": {
+    "claude": "low"
+  },
+  "savedProviderPermissionMode": {
+    "claude": "yolo"
+  },
   "lastCustomModel": "",
   "maxTabs": 3,
   "tabBarPosition": "input",

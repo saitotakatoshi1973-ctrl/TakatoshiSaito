@@ -11,14 +11,10 @@
             "id": "07d58d9e99f809b5",
             "type": "leaf",
             "state": {
-              "type": "markdown",
-              "state": {
-                "file": "kyorindo-cx/01_strategy/CX_roadmap_20260416_v3.md",
-                "mode": "source",
-                "source": false
-              },
+              "type": "empty",
+              "state": {},
               "icon": "lucide-file",
-              "title": "CX_roadmap_20260416_v3"
+              "title": "新規タブ"
             }
           }
         ]
@@ -195,6 +191,8 @@
   },
   "active": "1b88997f5930ea00",
   "lastOpenFiles": [
+    "mcp-servers/cybermail-imap/kb/emails.db-journal",
+    "sk-ant-api03-myClaudeCodeKey.txt",
     "kyorindo-cx/04_references/ツルハHD_IT記事データベース.xlsx",
     "kyorindo-cx/04_references/update_excel_db.py",
     "kyorindo-cx/04_references/ツルハHD_中期経営計画_LIFESTOREビジョン_20260409.md",
@@ -215,8 +213,6 @@
     "kyorindo-cx/01_strategy/CX_roadmap_20260405.md",
     "kyorindo-cx/01_strategy/CX_roadmap_20260405_v2.md.tmp.20928.1775383968896",
     "kyorindo-cx/01_strategy/CX_roadmap_20260405_v2.md.tmp.20928.1775383963180",
-    "kyorindo-cx/01_strategy/CX_roadmap_20260405_v2.md.tmp.20928.1775383957806",
-    "kyorindo-cx/01_strategy/CX_roadmap_20260405_v2.md.tmp.20928.1775383952304",
     "kyorindo-cx/01_strategy/CX_roadmap_20260405 1.md",
     "kyorindo-cx/06_outputs/20260404_ロードマップ作製に必要な情報_議論ログ.md",
     "kyorindo-cx/02_issues/杏林堂_既存課題サマリー_20260405.md",

@@ -1,0 +1,264 @@
+<mxfile host="Electron">
+  <diagram id="ZvFt84sp1zSPN49LmZjE" name="ページ-1">
+    <mxGraphModel dx="1631" dy="1263" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="1700" pageHeight="1300" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="inbox-section" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eff6ff;strokeColor=#93c5fd;strokeWidth=1.5;verticalAlign=top;" value="" vertex="1">
+          <mxGeometry height="560" width="1580" x="10" y="10" as="geometry" />
+        </mxCell>
+        <mxCell id="inbox-title" parent="1" style="text;html=1;align=center;strokeColor=none;fillColor=none;fontSize=14;fontStyle=1;fontColor=#1e40af;" value="📥  inbox-agent フロー" vertex="1">
+          <mxGeometry height="26" width="280" x="660" y="18" as="geometry" />
+        </mxCell>
+        <mxCell id="maint-section" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff7ed;strokeColor=#fdba74;strokeWidth=1.5;verticalAlign=top;" value="" vertex="1">
+          <mxGeometry height="478" width="1580" x="10" y="585" as="geometry" />
+        </mxCell>
+        <mxCell id="maint-title" parent="1" style="text;html=1;align=center;strokeColor=none;fillColor=none;fontSize=14;fontStyle=1;fontColor=#9a3412;" value="🔧  maintenance-agent フロー" vertex="1">
+          <mxGeometry height="26" width="360" x="620" y="593" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-pipeline" parent="1" style="text;html=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=1;fontColor=#475569;align=left;" value="▌ コアパイプライン" vertex="1">
+          <mxGeometry height="16" width="180" x="333" y="168" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-postproc" parent="1" style="text;html=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=1;fontColor=#475569;align=left;" value="▌ 後処理スキル（place-wiki が呼び出す）" vertex="1">
+          <mxGeometry height="16" width="320" x="333" y="276" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-learning" parent="1" style="text;html=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=1;fontColor=#475569;align=left;" value="▌ 学習ループ（フィードバック → ルール蓄積）" vertex="1">
+          <mxGeometry height="16" width="360" x="333" y="372" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-ds-top" parent="1" style="text;html=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=1;fontColor=#475569;align=left;" value="▌ データストア" vertex="1">
+          <mxGeometry height="16" width="160" x="333" y="490" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-weekly" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#b45309;strokeColor=none;fontColor=#ffffff;fontSize=9;fontStyle=1;" value="週 次" vertex="1">
+          <mxGeometry height="20" width="56" x="69" y="726" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-monthly" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#7c2d12;strokeColor=none;fontColor=#ffffff;fontSize=9;fontStyle=1;" value="月 次" vertex="1">
+          <mxGeometry height="20" width="56" x="69" y="850" as="geometry" />
+        </mxCell>
+        <mxCell id="lbl-ds-bot" parent="1" style="text;html=1;strokeColor=none;fillColor=none;fontSize=10;fontStyle=1;fontColor=#475569;align=left;" value="▌ データストア" vertex="1">
+          <mxGeometry height="16" width="160" x="69" y="966" as="geometry" />
+        </mxCell>
+        <mxCell id="user-top" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dbeafe;strokeColor=#93c5fd;fontSize=11;fontColor=#1e40af;" value="👤  ファイルを _inbox/ に投入" vertex="1">
+          <mxGeometry height="30" width="280" x="664" y="48" as="geometry" />
+        </mxCell>
+        <mxCell id="inbox-agent" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1e3a8a;strokeColor=none;fontColor=#ffffff;fontSize=12;" value="&lt;b&gt;🤖  inbox-agent.md&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;color:#93c5fd;&quot;&gt;「inbox処理して」で起動 → 1ファイルずつ順番に処理&lt;/font&gt;" vertex="1">
+          <mxGeometry height="54" width="420" x="594" y="88" as="geometry" />
+        </mxCell>
+        <mxCell id="p1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1d4ed8;strokeColor=none;fontColor=#ffffff;fontSize=10;" value="&lt;b&gt;① convert-binary.md&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;color:#bfdbfe;&quot;&gt;テキスト抽出・URL取得&lt;/font&gt;" vertex="1">
+          <mxGeometry height="55" width="162" x="333" y="184" as="geometry" />
+        </mxCell>
+        <mxCell id="p2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1d4ed8;strokeColor=none;fontColor=#ffffff;fontSize=10;" value="&lt;b&gt;② analyze.md&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;color:#bfdbfe;&quot;&gt;分類・wiki_type・信頼度判定&lt;/font&gt;" vertex="1">
+          <mxGeometry height="55" width="162" x="593" y="184" as="geometry" />
+        </mxCell>
+        <mxCell id="p3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1d4ed8;strokeColor=none;fontColor=#ffffff;fontSize=10;" value="&lt;b&gt;③ write-wiki.md&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;color:#bfdbfe;&quot;&gt;wiki Markdown 生成・保存&lt;/font&gt;" vertex="1">
+          <mxGeometry height="55" width="162" x="853" y="184" as="geometry" />
+        </mxCell>
+        <mxCell id="p4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1d4ed8;strokeColor=none;fontColor=#ffffff;fontSize=10;" value="&lt;b&gt;④ place-wiki.md&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;color:#bfdbfe;&quot;&gt;後処理オーケストレーター&lt;/font&gt;" vertex="1">
+          <mxGeometry height="55" width="162" x="1113" y="184" as="geometry" />
+        </mxCell>
+        <mxCell id="pp1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#15803d;strokeColor=none;fontColor=#ffffff;fontSize=10;" value="&lt;b&gt;route-binary.md&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;color:#bbf7d0;&quot;&gt;→ 00personal/ へ移動&lt;/font&gt;" vertex="1">
+          <mxGeometry height="55" width="162" x="333" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="pp2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#15803d;strokeColor=none;fontColor=#ffffff;fontSize=10;" value="&lt;b&gt;update-overview.md&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;color:#bbf7d0;&quot;&gt;_overview.md 更新&lt;/font&gt;" vertex="1">
+          <mxGeometry height="55" width="162" x="853" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="pp3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#15803d;strokeColor=none;fontColor=#ffffff;fontSize=10;" value="&lt;b&gt;index-builder.md (add)&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;color:#bbf7d0;&quot;&gt;ベクトルindex 1件追加&lt;/font&gt;" vertex="1">
+          <mxGeometry height="55" width="162" x="1113" y="300" as="geometry" />
+        </mxCell>
+        <mxCell id="l1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#6d28d9;strokeColor=none;fontColor=#ffffff;fontSize=10;" value="&lt;b&gt;record-feedback.md&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;color:#ddd6fe;&quot;&gt;修正を即時記録&lt;/font&gt;" vertex="1">
+          <mxGeometry height="55" width="162" x="333" y="400" as="geometry" />
+        </mxCell>
+        <mxCell id="l2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1e293b;strokeColor=none;fontColor=#ffffff;fontSize=10;" value="&lt;b&gt;📄 feedback-log.md&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;color:#94a3b8;&quot;&gt;修正履歴蓄積&lt;/font&gt;" vertex="1">
+          <mxGeometry height="55" width="162" x="593" y="400" as="geometry" />
+        </mxCell>
+        <mxCell id="l3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#6d28d9;strokeColor=none;fontColor=#ffffff;fontSize=10;" value="&lt;b&gt;learn-from-feedback.md&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;color:#ddd6fe;&quot;&gt;ルール抽出・提案&lt;/font&gt;" vertex="1">
+          <mxGeometry height="55" width="162" x="853" y="400" as="geometry" />
+        </mxCell>
+        <mxCell id="l4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#1e293b;strokeColor=none;fontColor=#ffffff;fontSize=10;" value="&lt;b&gt;📄 classification-hints.md&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;color:#94a3b8;&quot;&gt;分類ルール蓄積&lt;/font&gt;" vertex="1">
+          <mxGeometry height="55" width="162" x="1113" y="400" as="geometry" />
+        </mxCell>
+        <mxCell id="ds1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0f172a;strokeColor=none;fontColor=#ffffff;fontSize=9;" value="&lt;b&gt;🗄 _overview.md（各フォルダ）&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:8px;color:#94a3b8;&quot;&gt;フォルダ概要&lt;/font&gt;" vertex="1">
+          <mxGeometry height="40" width="162" x="333" y="504" as="geometry" />
+        </mxCell>
+        <mxCell id="ds2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0f172a;strokeColor=none;fontColor=#ffffff;fontSize=9;" value="&lt;b&gt;🗄 change_log_YYYY-MM.md&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:8px;color:#94a3b8;&quot;&gt;月次変更履歴&lt;/font&gt;" vertex="1">
+          <mxGeometry height="40" width="162" x="593" y="504" as="geometry" />
+        </mxCell>
+        <mxCell id="ds3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0f172a;strokeColor=none;fontColor=#ffffff;fontSize=9;" value="&lt;b&gt;🗄 personal-index.yaml&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:8px;color:#94a3b8;&quot;&gt;00personal/ フォルダ索引&lt;/font&gt;" vertex="1">
+          <mxGeometry height="40" width="162" x="853" y="504" as="geometry" />
+        </mxCell>
+        <mxCell id="ds4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0f172a;strokeColor=none;fontColor=#ffffff;fontSize=9;" value="&lt;b&gt;🗄 wiki-embeddings.npz&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:8px;color:#94a3b8;&quot;&gt;ベクトルindex&lt;/font&gt;" vertex="1">
+          <mxGeometry height="40" width="162" x="1113" y="504" as="geometry" />
+        </mxCell>
+        <mxCell id="e-utop-ia" edge="1" parent="1" source="user-top" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#475569;strokeWidth=1.5;" target="inbox-agent" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-ia-p1" edge="1" parent="1" source="inbox-agent" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#475569;strokeWidth=1.5;exitX=0.3;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="p1" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-p1p2" edge="1" parent="1" source="p1" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#60a5fa;strokeWidth=2;" target="p2" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-p2p3" edge="1" parent="1" source="p2" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#60a5fa;strokeWidth=2;" target="p3" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-p3p4" edge="1" parent="1" source="p3" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#60a5fa;strokeWidth=2;" target="p4" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-p4pp1" edge="1" parent="1" source="p4" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#475569;strokeWidth=1.5;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="pp1" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-p4pp2" edge="1" parent="1" source="p4" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#475569;strokeWidth=1.5;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="pp2" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-p4pp3" edge="1" parent="1" source="p4" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#475569;strokeWidth=1.5;" target="pp3" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-pp1l1" edge="1" parent="1" source="pp1" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#475569;strokeWidth=1.5;" target="l1" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-p2l1" edge="1" parent="1" source="p2" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#a78bfa;strokeWidth=1.3;dashed=1;dashPattern=5 3;fontColor=#5b21b6;fontSize=8;labelBackgroundColor=#ede9fe;entryX=0;entryY=0.5;entryDx=0;entryDy=0;exitX=0;exitY=0.75;exitDx=0;exitDy=0;" target="l1" value="信頼度 &lt;6 のとき記録">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="535" y="225" />
+              <mxPoint x="535" y="261" />
+              <mxPoint x="235" y="261" />
+              <mxPoint x="235" y="428" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-l1l2" edge="1" parent="1" source="l1" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#475569;strokeWidth=1.5;" target="l2" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-l2l3" edge="1" parent="1" source="l2" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#475569;strokeWidth=1.5;" target="l3" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-l3l4" edge="1" parent="1" source="l3" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#475569;strokeWidth=1.5;" target="l4" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-l4p2" edge="1" parent="1" source="l4" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#a78bfa;strokeWidth=1.3;dashed=1;dashPattern=5 3;fontColor=#5b21b6;fontSize=8;labelBackgroundColor=#ede9fe;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=1;entryY=0.25;entryDx=0;entryDy=0;" target="p2" value="ルール参照">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1349" y="428" />
+              <mxPoint x="1349" y="161" />
+              <mxPoint x="793" y="161" />
+              <mxPoint x="793" y="198" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-pp2ds1" edge="1" parent="1" source="pp2" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#475569;strokeWidth=1;dashed=1;dashPattern=3 2;" target="ds1" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-pp3ds4" edge="1" parent="1" source="pp3" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#475569;strokeWidth=1;dashed=1;dashPattern=3 2;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" target="ds4" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1314" y="328" />
+              <mxPoint x="1314" y="480" />
+              <mxPoint x="1194" y="480" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="user-bot" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fed7aa;strokeColor=#fdba74;fontSize=11;fontColor=#9a3412;" value="👤  「wiki週次/月次メンテナンス実行」" vertex="1">
+          <mxGeometry height="30" width="320" x="640" y="618" as="geometry" />
+        </mxCell>
+        <mxCell id="maint-agent" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#7c2d12;strokeColor=none;fontColor=#ffffff;fontSize=12;" value="&lt;b&gt;🤖  maintenance-agent.md&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;color:#fdba74;&quot;&gt;週次タスク 5 件 → 月次タスク 2 件を順番に実行&lt;/font&gt;" vertex="1">
+          <mxGeometry height="54" width="520" x="540" y="660" as="geometry" />
+        </mxCell>
+        <mxCell id="w1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#b45309;strokeColor=none;fontColor=#ffffff;fontSize=10;" value="&lt;b&gt;index-builder.md&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;color:#fde68a;&quot;&gt;(rebuild) 全件再構築&lt;/font&gt;" vertex="1">
+          <mxGeometry height="55" width="162" x="69" y="752" as="geometry" />
+        </mxCell>
+        <mxCell id="w2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#b45309;strokeColor=none;fontColor=#ffffff;fontSize=10;" value="&lt;b&gt;update-overview.md&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;color:#fde68a;&quot;&gt;(ALL) 全フォルダ更新&lt;/font&gt;" vertex="1">
+          <mxGeometry height="55" width="162" x="329" y="752" as="geometry" />
+        </mxCell>
+        <mxCell id="w3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#b45309;strokeColor=none;fontColor=#ffffff;fontSize=10;" value="&lt;b&gt;sync-personal.md&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;color:#fde68a;&quot;&gt;00personal/ フォルダ同期&lt;/font&gt;" vertex="1">
+          <mxGeometry height="55" width="162" x="589" y="752" as="geometry" />
+        </mxCell>
+        <mxCell id="w4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#b45309;strokeColor=none;fontColor=#ffffff;fontSize=10;" value="&lt;b&gt;sync-wiki.md&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;color:#fde68a;&quot;&gt;直接追加ファイル検知&lt;/font&gt;" vertex="1">
+          <mxGeometry height="55" width="162" x="849" y="752" as="geometry" />
+        </mxCell>
+        <mxCell id="w5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#b45309;strokeColor=none;fontColor=#ffffff;fontSize=10;" value="&lt;b&gt;check-integrity.md&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;color:#fde68a;&quot;&gt;FM欠落・未登録を自動修正&lt;/font&gt;" vertex="1">
+          <mxGeometry height="55" width="162" x="1109" y="752" as="geometry" />
+        </mxCell>
+        <mxCell id="w6" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0e7490;strokeColor=none;fontColor=#ffffff;fontSize=10;" value="&lt;b&gt;web-search.md&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;color:#a5f3fc;&quot;&gt;Web検索 → wiki 自動生成&lt;br&gt;&lt;i&gt;→ ③ write-wiki.md を呼び出す&lt;/i&gt;&lt;/font&gt;" vertex="1">
+          <mxGeometry height="55" width="162" x="1369" y="752" as="geometry" />
+        </mxCell>
+        <mxCell id="m1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#92400e;strokeColor=none;fontColor=#ffffff;fontSize=10;" value="&lt;b&gt;update-changelog.md&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;color:#fde68a;&quot;&gt;月次ログ圧縮 → 年次化&lt;/font&gt;" vertex="1">
+          <mxGeometry height="55" width="162" x="69" y="876" as="geometry" />
+        </mxCell>
+        <mxCell id="m2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#6d28d9;strokeColor=none;fontColor=#ffffff;fontSize=10;" value="&lt;b&gt;learn-from-feedback.md&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px;color:#ddd6fe;&quot;&gt;フィードバック学習・ルール提案&lt;/font&gt;" vertex="1">
+          <mxGeometry height="55" width="162" x="329" y="876" as="geometry" />
+        </mxCell>
+        <mxCell id="dsb1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0f172a;strokeColor=none;fontColor=#ffffff;fontSize=9;" value="&lt;b&gt;🗄 wiki-embeddings.npz&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:8px;color:#94a3b8;&quot;&gt;ベクトルindex（全件再構築）&lt;/font&gt;" vertex="1">
+          <mxGeometry height="40" width="162" x="69" y="976" as="geometry" />
+        </mxCell>
+        <mxCell id="dsb2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0f172a;strokeColor=none;fontColor=#ffffff;fontSize=9;" value="&lt;b&gt;🗄 personal-index.yaml&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:8px;color:#94a3b8;&quot;&gt;00personal/ フォルダ索引&lt;/font&gt;" vertex="1">
+          <mxGeometry height="40" width="162" x="329" y="976" as="geometry" />
+        </mxCell>
+        <mxCell id="dsb3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0f172a;strokeColor=none;fontColor=#ffffff;fontSize=9;" value="&lt;b&gt;🗄 change_log_YYYY.md&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:8px;color:#94a3b8;&quot;&gt;年次変更履歴&lt;/font&gt;" vertex="1">
+          <mxGeometry height="40" width="162" x="589" y="976" as="geometry" />
+        </mxCell>
+        <mxCell id="dsb4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0f172a;strokeColor=none;fontColor=#ffffff;fontSize=9;" value="&lt;b&gt;🗄 integrity-report.md&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:8px;color:#94a3b8;&quot;&gt;整合性チェック結果&lt;/font&gt;" vertex="1">
+          <mxGeometry height="40" width="162" x="849" y="976" as="geometry" />
+        </mxCell>
+        <mxCell id="dsb5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#0f172a;strokeColor=none;fontColor=#ffffff;fontSize=9;" value="&lt;b&gt;🗄 maintenance-log.md&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:8px;color:#94a3b8;&quot;&gt;実行履歴（直近3ヶ月）&lt;/font&gt;" vertex="1">
+          <mxGeometry height="40" width="162" x="1109" y="976" as="geometry" />
+        </mxCell>
+        <mxCell id="e-ubot-ma" edge="1" parent="1" source="user-bot" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#475569;strokeWidth=1.5;" target="maint-agent" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-ma-w1" edge="1" parent="1" source="maint-agent" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#ea580c;strokeWidth=2;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="w1" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-ma-w2" edge="1" parent="1" source="maint-agent" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#ea580c;strokeWidth=2;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="w2" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-ma-w3" edge="1" parent="1" source="maint-agent" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#ea580c;strokeWidth=2;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="w3" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-ma-w4" edge="1" parent="1" source="maint-agent" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#ea580c;strokeWidth=2;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="w4" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-ma-w5" edge="1" parent="1" source="maint-agent" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#ea580c;strokeWidth=2;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="w5" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-ma-w6" edge="1" parent="1" source="maint-agent" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#ea580c;strokeWidth=2;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="w6" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-ma-m1" edge="1" parent="1" source="maint-agent" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#92400e;strokeWidth=2;dashed=1;dashPattern=8 4;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="m1" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1575" y="687" />
+              <mxPoint x="1575" y="858" />
+              <mxPoint x="150" y="858" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-ma-m2" edge="1" parent="1" source="maint-agent" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#92400e;strokeWidth=2;dashed=1;dashPattern=8 4;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="m2" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1575" y="687" />
+              <mxPoint x="1575" y="858" />
+              <mxPoint x="410" y="858" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-w1dsb1" edge="1" parent="1" source="w1" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#475569;strokeWidth=1;dashed=1;dashPattern=3 2;" target="dsb1" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-w3dsb2" edge="1" parent="1" source="w3" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#475569;strokeWidth=1;dashed=1;dashPattern=3 2;exitX=0.25;exitY=1;exitDx=0;exitDy=0;" target="dsb2" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="630" y="892" />
+              <mxPoint x="551" y="892" />
+              <mxPoint x="551" y="996" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="e-m1dsb3" edge="1" parent="1" source="m1" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#475569;strokeWidth=1;dashed=1;dashPattern=3 2;" target="dsb3" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="e-w5dsb4" edge="1" parent="1" source="w5" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#475569;strokeWidth=1;dashed=1;dashPattern=3 2;" target="dsb4" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

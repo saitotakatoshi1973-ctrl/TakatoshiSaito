@@ -257,7 +257,7 @@ class _Session:
         )
         emails: list[dict] = []
         pattern = (
-            r'\[0,\s*\'([A-Z0-9_]+)\',\s*(\d+),\s*"([^"]*)",\s*'
+            r'\[0,\s*\'([^\']+)\',\s*(\d+),\s*"([^"]*)",\s*'
             r'\["([^"]*)",\s*"([^"]*)"\],\s*\'([^\']*)\''
         )
         for m in re.finditer(pattern, body):

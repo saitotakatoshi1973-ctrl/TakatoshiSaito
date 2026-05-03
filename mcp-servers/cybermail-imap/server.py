@@ -130,7 +130,7 @@ class CybermailSession:
         emails: list[dict] = []
         # rgRec 形式: [0, 'MSG_ID', uid_num, "subject", ["nick", "addr"], 'date', 'size', ...]
         pattern = (
-            r'\[0,\s*\'([A-Z0-9_]+)\',\s*(\d+),\s*"([^"]*)",\s*'
+            r'\[0,\s*\'([^\']+)\',\s*(\d+),\s*"([^"]*)",\s*'
             r'\["([^"]*)",\s*"([^"]*)"\],\s*\'([^\']*)\''
         )
         for m in re.finditer(pattern, body):
