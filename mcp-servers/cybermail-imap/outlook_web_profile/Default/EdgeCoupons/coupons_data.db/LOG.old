@@ -1,0 +1,10 @@
+2026/05/03-12:56:36.659 10f0 Reusing MANIFEST C:\Users\takatoshi-saito\OneDrive\00personal\ClaudeCodeFolder\mcp-servers\cybermail-imap\outlook_web_profile\Default\EdgeCoupons/coupons_data.db/MANIFEST-000001
+2026/05/03-12:56:36.660 10f0 Recovering log #4
+2026/05/03-12:56:36.661 10f0 Level-0 table #7: started
+2026/05/03-12:56:36.667 10f0 Level-0 table #7: 682232 bytes OK
+2026/05/03-12:56:36.668 10f0 Recovering log #7
+2026/05/03-12:56:36.669 10f0 Reusing old log C:\Users\takatoshi-saito\OneDrive\00personal\ClaudeCodeFolder\mcp-servers\cybermail-imap\outlook_web_profile\Default\EdgeCoupons/coupons_data.db/000007.log 
+2026/05/03-12:56:36.674 10f0 Delete type=0 #4
+2026/05/03-12:56:36.674 10f0 Delete type=2 #8
+2026/05/03-12:56:36.679 5a74 Level-0 table #9: started
+2026/05/03-12:56:36.684 5a74 Level-0 table #9: 682232 bytes OK

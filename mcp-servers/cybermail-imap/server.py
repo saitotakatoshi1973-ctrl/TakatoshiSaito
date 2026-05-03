@@ -285,6 +285,7 @@ def init_db(db_path: str) -> sqlite3.Connection:
         CREATE TABLE IF NOT EXISTS folders (
             mbox       TEXT PRIMARY KEY,
             name       TEXT,
+            source     TEXT,
             synced_at  TEXT
         )
     """)
@@ -299,6 +300,8 @@ def init_db(db_path: str) -> sqlite3.Connection:
             date        TEXT,
             body_text   TEXT,
             attachments TEXT,
+            source      TEXT,
+            classification TEXT,
             synced_at   TEXT,
             UNIQUE(msg_id, folder)
         )
@@ -312,8 +315,19 @@ def init_db(db_path: str) -> sqlite3.Connection:
     if "attachments" not in cols:
         conn.execute("ALTER TABLE emails ADD COLUMN attachments TEXT")
     if "source" not in cols:
-        conn.execute("ALTER TABLE emails ADD COLUMN source TEXT DEFAULT 'cybermail'")
-        conn.execute("UPDATE emails SET source = 'cybermail' WHERE source IS NULL")
+        conn.execute("ALTER TABLE emails ADD COLUMN source TEXT")
+    if "classification" not in cols:
+        conn.execute("ALTER TABLE emails ADD COLUMN classification TEXT")
+
+    folder_cols = [row[1] for row in conn.execute("PRAGMA table_info(folders)").fetchall()]
+    if "source" not in folder_cols:
+        conn.execute("ALTER TABLE folders ADD COLUMN source TEXT")
+
+    conn.execute("UPDATE emails SET source = 'cybermail' WHERE source IS NULL")
+    conn.execute("UPDATE folders SET source = 'cybermail' WHERE source IS NULL")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_emails_source ON emails(source)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_emails_classification ON emails(classification)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_folders_source ON folders(source)")
 
     conn.commit()
     return conn
@@ -331,8 +345,8 @@ def _sync_folder_web(
         email_list = session.get_email_list(mbox, max_per_folder)
         if not email_list:
             db.execute(
-                "INSERT OR REPLACE INTO folders (mbox, name, synced_at) VALUES (?,?,?)",
-                (mbox, mbox_name, datetime.now().isoformat()),
+                "INSERT OR REPLACE INTO folders (mbox, name, source, synced_at) VALUES (?,?,?,?)",
+                (mbox, mbox_name, "cybermail", datetime.now().isoformat()),
             )
             db.commit()
             return 0
@@ -357,8 +371,8 @@ def _sync_folder_web(
                 date        = full_date or meta["date_str"]
                 db.execute(
                     """INSERT OR IGNORE INTO emails
-                       (msg_id, folder, from_addr, to_addr, subject, date, body_text, attachments, synced_at)
-                       VALUES (?,?,?,?,?,?,?,?,?)""",
+                       (msg_id, folder, from_addr, to_addr, subject, date, body_text, attachments, source, synced_at)
+                       VALUES (?,?,?,?,?,?,?,?,?,?)""",
                     (
                         meta["msg_id"],
                         mbox,
@@ -368,6 +382,7 @@ def _sync_folder_web(
                         date,
                         body_text[:50000],
                         attachments,
+                        "cybermail",
                         datetime.now().isoformat(),
                     ),
                 )
@@ -377,8 +392,8 @@ def _sync_folder_web(
                 fallback_date = _parse_full_date("", meta["date_str"])
                 db.execute(
                     """INSERT OR IGNORE INTO emails
-                       (msg_id, folder, from_addr, to_addr, subject, date, body_text, attachments, synced_at)
-                       VALUES (?,?,?,?,?,?,?,?,?)""",
+                       (msg_id, folder, from_addr, to_addr, subject, date, body_text, attachments, source, synced_at)
+                       VALUES (?,?,?,?,?,?,?,?,?,?)""",
                     (
                         meta["msg_id"],
                         mbox,
@@ -388,14 +403,15 @@ def _sync_folder_web(
                         fallback_date or meta["date_str"],
                         "",
                         None,
+                        "cybermail",
                         datetime.now().isoformat(),
                     ),
                 )
                 added += 1
 
         db.execute(
-            "INSERT OR REPLACE INTO folders (mbox, name, synced_at) VALUES (?,?,?)",
-            (mbox, mbox_name, datetime.now().isoformat()),
+            "INSERT OR REPLACE INTO folders (mbox, name, source, synced_at) VALUES (?,?,?,?)",
+            (mbox, mbox_name, "cybermail", datetime.now().isoformat()),
         )
         db.commit()
         return added

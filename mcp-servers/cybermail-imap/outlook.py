@@ -335,7 +335,7 @@ def sync_folder_to_db(
     existing = {
         row[0]
         for row in db.execute(
-            "SELECT msg_id FROM emails WHERE folder = ? AND source = 'outlook'",
+            "SELECT msg_id FROM emails WHERE folder = ? AND source = 'outlook_web'",
             (folder_path,)
         ).fetchall()
     }
@@ -400,7 +400,7 @@ def sync_folder_to_db(
                     date,
                     body,
                     json.dumps(att_names, ensure_ascii=False) if att_names else "[]",
-                    "outlook",
+                    "outlook_web",
                     datetime.now().isoformat(),
                 ),
             )

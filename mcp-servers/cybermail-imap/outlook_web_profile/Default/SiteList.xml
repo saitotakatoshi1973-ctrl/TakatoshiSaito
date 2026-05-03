@@ -1,0 +1,75 @@
+<?xml version="1.0"?>
+<site-list version="1">
+ <site url="10.248.21.10">
+  <compat-mode>Default</compat-mode>
+  <open-in>IE11</open-in>
+ </site>
+ <site url="10.248.22.111">
+  <compat-mode>Default</compat-mode>
+  <open-in>IE11</open-in>
+ </site>
+ <site url="10.7.0.166">
+  <compat-mode>IE8Enterprise</compat-mode>
+  <open-in>IE11</open-in>
+ </site>
+ <site url="10.7.0.2">
+  <compat-mode>IE8Enterprise</compat-mode>
+  <open-in>IE11</open-in>
+ </site>
+ <site url="10.7.0.6">
+  <compat-mode>IE8Enterprise</compat-mode>
+  <open-in>IE11</open-in>
+ </site>
+ <site url="10.7.0.60">
+  <compat-mode>IE8Enterprise</compat-mode>
+  <open-in>IE11</open-in>
+ </site>
+ <site url="10.7.0.77">
+  <compat-mode>IE8Enterprise</compat-mode>
+  <open-in>IE11</open-in>
+ </site>
+ <site url="10.7.0.8">
+  <compat-mode>IE8Enterprise</compat-mode>
+  <open-in>IE11</open-in>
+ </site>
+ <site url="10.7.0.9">
+  <compat-mode>IE8Enterprise</compat-mode>
+  <open-in>IE11</open-in>
+ </site>
+ <site url="172.21.220.10">
+  <compat-mode>IE8Enterprise</compat-mode>
+  <open-in>IE11</open-in>
+ </site>
+ <site url="senca.senko-shoji.co.jp">
+  <compat-mode>Default</compat-mode>
+  <open-in>IE11</open-in>
+ </site>
+ <site url="tsuruha-hd.obic7.obicnet.ne.jp">
+  <compat-mode>Default</compat-mode>
+  <open-in>IE11</open-in>
+ </site>
+ <site url="webhoisv.kyorindo.co.jp">
+  <compat-mode>IE8Enterprise</compat-mode>
+  <open-in>IE11</open-in>
+ </site>
+ <site url="websv">
+  <compat-mode>IE8Enterprise</compat-mode>
+  <open-in>IE11</open-in>
+ </site>
+ <site url="webtaurus01.kyorindo.co.jp">
+  <compat-mode>IE8Enterprise</compat-mode>
+  <open-in>IE11</open-in>
+ </site>
+ <site url="webtaurus02.kyorindo.co.jp">
+  <compat-mode>IE8Enterprise</compat-mode>
+  <open-in>IE11</open-in>
+ </site>
+ <site url="webtaurus08.kyorindo.co.jp">
+  <compat-mode>IE8Enterprise</compat-mode>
+  <open-in>IE11</open-in>
+ </site>
+ <site url="webtaurus09.kyorindo.co.jp">
+  <compat-mode>IE8Enterprise</compat-mode>
+  <open-in>IE11</open-in>
+ </site>
+</site-list>
