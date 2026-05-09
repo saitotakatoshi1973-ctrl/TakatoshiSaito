@@ -36,7 +36,10 @@
       "WebFetch(domain:www.microsoft.com)",
       "WebFetch(domain:www.digital.go.jp)",
       "WebFetch(domain:digital-gov.note.jp)",
-      "WebFetch(domain:dxmagazine.jp)"
+      "WebFetch(domain:dxmagazine.jp)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)",
+      "Bash(git push *)"
     ]
   }
 }
