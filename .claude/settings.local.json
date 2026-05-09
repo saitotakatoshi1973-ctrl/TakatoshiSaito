@@ -36,7 +36,10 @@
       "WebFetch(domain:www.microsoft.com)",
       "WebFetch(domain:www.digital.go.jp)",
       "WebFetch(domain:digital-gov.note.jp)",
-      "WebFetch(domain:dxmagazine.jp)"
+      "WebFetch(domain:dxmagazine.jp)",
+      "Bash(cd \"C:\\\\Users\\\\takatoshi-saito\\\\OneDrive\\\\00personal\\\\ClaudeCodeFolder\" && cat .gitignore 2>/dev/null | head -40)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }
