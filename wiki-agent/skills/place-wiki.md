@@ -29,6 +29,29 @@ original_file: "_inbox/CX_roadmap_v4.pptx"   # 元ファイルのパス（_inbox
 original_personal_path: "03_CX推進/01_戦略/CX_roadmap_v4.pptx"  # 00personal 相対パス
 file_hash: "a3f8c2d1..."                                          # MD5 ハッシュ
 skip_route_binary: true   # True の場合 STEP 4 をスキップ（元ファイルは既に 00personal にある）
+batch_mode: false         # True の場合 STEP 1（overview更新）/STEP 2（changelog）/STEP 3（index）をスキップ
+                          # → batch-inbox.md の flush_batch_post_processing() で一括実行
+```
+
+---
+
+## batch_mode での動作（クレジット削減）
+
+`batch_mode: true` の場合、以下のステップをスキップし、
+呼び出し元の `batch-inbox.md` が `flush_batch_post_processing()` で一括実行する。
+
+| ステップ | batch_mode=false（通常） | batch_mode=true（バッチ） |
+|---------|------------------------|--------------------------|
+| STEP 1: _overview.md スタブ作成 | 実行する | **実行する**（新規フォルダのスタブ作成は即時） |
+| STEP 1: update-overview.md 呼び出し | 実行する | **スキップ**（flush で一括） |
+| STEP 2: change_log 追記 | 実行する | **スキップ**（flush で一括） |
+| STEP 2.5: processed-sources.yaml 記録 | 実行する | **実行する**（障害回復のため即時） |
+| STEP 3: index-builder 呼び出し | 実行する | **スキップ**（flush で一括） |
+| STEP 4: route-binary 呼び出し | skip_route_binary で制御 | skip_route_binary で制御 |
+
+```python
+# batch_mode フラグの確認（各ステップで参照）
+batch_mode = input_yaml.get("batch_mode", False)
 ```
 
 ---
@@ -36,7 +59,7 @@ skip_route_binary: true   # True の場合 STEP 4 をスキップ（元ファイ
 ## STEP 1: 新規サブフォルダの `_overview.md` スタブ作成
 
 `write-wiki.md` が新しいサブフォルダを作成した場合（`_overview.md` が存在しない場合）、
-スタブファイルを自動作成する。
+スタブファイルを自動作成する。（batch_mode でも実行する）
 
 ```python
 import os
@@ -94,7 +117,23 @@ overview_created = create_overview_stub(dest_dir, folder_name)
 
 ---
 
+### _overview.md 更新（batch_mode=False の場合のみ即時実行）
+
+```python
+# _overview.md が存在する場合のみ更新。batch_mode=True はスキップ（flush で一括）
+if not batch_mode:
+    overview_path = os.path.join(dest_dir, "_overview.md")
+    if os.path.exists(overview_path):
+        update_overview_run(overview_path)
+```
+
+---
+
 ## STEP 2: `change_log` に1行追記する
+
+> `batch_mode=True` の場合はこのステップをスキップする。
+> エントリは `run_batch()` の `deferred_changelog` に積まれ、
+> `flush_batch_post_processing()` で一括書き込みされる。
 
 月次ファイル（`_system/change_log_YYYY-MM.md`）に1行追記する。
 ファイルが存在しない場合は新規作成する。
@@ -280,14 +319,30 @@ if skip_route_binary:
 
 ---
 
+```python
+# batch_mode=True の場合はスキップ（flush で一括書き込み）
+if not batch_mode:
+    append_change_log(kb_root, f"[追加] {wiki_destination}{filename}")
+    if overview_created:
+        append_change_log(kb_root, f"[新規フォルダ] {wiki_destination} (_overview.md 作成)")
+```
+
+---
+
 ## STEP 3: `index-builder.md` スキルを呼び出す
+
+> `batch_mode=True` の場合はこのステップをスキップする。
+> 全ファイル処理後に `flush_batch_post_processing()` が
+> `index_builder_run(mode="add_batch", file_paths=[...])` を1回だけ呼ぶ。
 
 ベクトルindex（`wiki-embeddings.npz`）に新規wikiファイルを追加登録する。
 
-```
-→ index-builder.md を呼び出す
-  入力: saved_path（新規追加ファイルの絶対パス）
-  動作: 差分追加（全件再生成ではなく1件追加）
+```python
+# batch_mode=True の場合はスキップ（flush で一括）
+if not batch_mode:
+    idx_result = index_builder_run(mode="add", file_path=saved_path)
+    if idx_result.get("status") == "success":
+        update_processed_field(source_path, {"index_registered": True})
 ```
 
 > `index-builder.md` の実装詳細はスキル8を参照。

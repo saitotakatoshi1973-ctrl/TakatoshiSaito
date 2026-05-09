@@ -32,6 +32,7 @@
 | `max_files` | — | `10` | 1回の処理上限件数（未処理+再処理の合計） |
 | `wiki_filter` | — | `false` | LLM事前スクリーニングで低価値ファイルを除外するか |
 | `wiki_score_threshold` | — | `6` | wiki_filter 有効時の採用スコア下限（0〜10） |
+| `wiki_detail_level` | — | `"summary"` | wikiの詳細度。`"summary"`（箇条書き中心・短め）/ `"full"`（全テンプレート・詳細） |
 
 ---
 
@@ -101,6 +102,30 @@ def hydrate_cloud_file(path: str, timeout: int = 300, wait: int = 5) -> bool:
 
     return not is_cloud_only(path)
 ```
+
+---
+
+## バッチ実行前の一括読み込み（クレジット削減）
+
+バッチ処理を開始する前に、以下のファイルを **1回だけ** 読み込む。
+処理ループ内では再読み込みしない。
+
+```python
+# ── サブスキル（1回だけ読んでメモリに保持）──
+# Read: wiki-agent/skills/convert-binary.md
+# Read: wiki-agent/skills/analyze.md
+# Read: wiki-agent/skills/write-wiki.md
+# Read: wiki-agent/skills/place-wiki.md
+
+# ── 分類ルール（全ファイル共通）──
+# Read: KnowledgeBase/_system/SCHEMA.md
+# Read: KnowledgeBase/_system/learning/classification-hints.md
+```
+
+> **重要**: これらを `Skill()` ツールで呼び出さないこと。
+> `Skill()` は呼ぶたびにスキルファイル全文をコンテキストに注入するため、
+> バッチ処理でファイル数分だけクレジットを消費する。
+> 代わりに `Read` ツールで1回読み込み、以降はメモリ上の内容を再利用する。
 
 ---
 
@@ -263,6 +288,51 @@ def hydrate_selected_cloud_files(download_targets: list[dict]) -> dict:
 
 ## STEP 1.6: wiki化価値をスクリーニングする（wiki_filter=true 時のみ）
 
+`wiki_filter=true` の場合、まずルールベースで除外し、残ったファイルのみ LLM スコアリングを行う。
+これにより LLM 呼び出し回数を削減できる。
+
+### 1.6-A: ルールベース事前フィルタ（LLM 不要・即時判定）
+
+```python
+import re
+
+# 明らかに低価値なファイルをLLMを使わずに除外するパターン
+EXCLUDE_NAME_PATTERNS = [
+    re.compile(r'^img[-_]\w+\.(pdf|png|jpg|jpeg)', re.IGNORECASE),  # スキャン画像PDF
+    re.compile(r'^~\$'),                                              # Officeテンポラリ
+    re.compile(r'テンプレート|template', re.IGNORECASE),              # テンプレート類
+    re.compile(r'特売\s*POP|pop素材', re.IGNORECASE),                 # POPデザイン
+    re.compile(r'^ReadMe', re.IGNORECASE),                            # README
+    re.compile(r'サイズ見本|見本帳'),                                  # 見本類
+    re.compile(r'申請書[\s_]*(様式|フォーム)'),                        # 申請書フォーム
+]
+
+def rule_based_filter(files: list[str]) -> dict:
+    """
+    ファイル名パターンマッチングで即時除外する（LLM不要）。
+    戻り値: { "passed": list[str], "excluded": list[dict] }
+    """
+    passed   = []
+    excluded = []
+
+    for f in files:
+        fname = os.path.basename(f)
+        matched = next(
+            (p.pattern for p in EXCLUDE_NAME_PATTERNS if p.search(fname)),
+            None
+        )
+        if matched:
+            excluded.append({"path": f, "reason": f"ルールベース除外: {matched}"})
+        else:
+            passed.append(f)
+
+    return {"passed": passed, "excluded": excluded}
+```
+
+ルールベースフィルタ後、残ったファイルのみ LLM スコアリングへ進む。
+
+### 1.6-B: LLM スコアリング（wiki_filter=true かつルールで残ったファイルのみ）
+
 `wiki_filter=true` の場合、ファイル名とフォルダパスをもとに LLM が wiki 化価値を
 0〜10 でスコアリングし、`wiki_score_threshold`（デフォルト6）未満のファイルを除外する。
 
@@ -311,21 +381,24 @@ def pre_screen_wiki_value(
     batch_size: int = 30,
 ) -> dict:
     """
-    ファイルリストを LLM にスコアリングさせ、閾値以上のみ通す。
+    ① ルールベースで即時除外 → ② 残りを LLM スコアリング の2段階で処理する。
     LLM トークン節約のため batch_size 件ずつ分割して処理する。
 
     戻り値: {
-        "passed": list[str],   # 採用ファイル（score >= threshold）
-        "filtered": list[dict] # 除外ファイル（score, reason 付き）
+        "passed":   list[str],   # 採用ファイル（rule通過 + score >= threshold）
+        "filtered": list[dict]   # 除外ファイル（rule除外 + LLM低スコア）
     }
     """
-    passed   = []
-    filtered = []
+    # ① ルールベース事前フィルタ（LLM不要）
+    rule_result = rule_based_filter(files)
+    filtered    = rule_result["excluded"]   # ルールで除外済み
+    candidates  = rule_result["passed"]     # LLMスコアリング対象
 
-    for i in range(0, len(files), batch_size):
-        batch = files[i:i + batch_size]
+    passed = []
 
-        # LLM にスコアリングを依頼
+    # ② LLMスコアリング（ルールを通過したファイルのみ）
+    for i in range(0, len(candidates), batch_size):
+        batch = candidates[i:i + batch_size]
         scores = llm_score_wiki_value(batch)   # 上記プロンプトで呼び出し
 
         for item in scores:
@@ -579,13 +652,25 @@ def show_preview(
 ## STEP 4〜6: 処理実行
 
 ```python
-def run_batch(to_process: list[str], filtered: dict) -> dict:
+def run_batch(
+    to_process: list[str],
+    filtered: dict,
+    wiki_detail_level: str = "summary",
+) -> dict:
     """
     to_process の各ファイルを wiki 化する。1ファイルずつ直列で処理する。
+
+    クレジット削減のため batch_mode=True を place-wiki に渡し、
+    _overview.md 更新・change_log 追記・index-builder 呼び出しを
+    処理ループ内では行わず、後で flush_batch_post_processing() にまとめる。
     """
-    results = []
-    skipped = []
-    errors  = []
+    results      = []
+    skipped      = []
+    errors       = []
+    # バッチ末尾で一括処理する後処理キュー
+    deferred_overviews  = set()    # 更新が必要なフォルダパス（重複排除）
+    deferred_changelog  = []       # change_log エントリ（文字列リスト）
+    deferred_wiki_paths = []       # index-builder に渡す wiki パス
 
     for abs_path in to_process:
         rel_path  = to_personal_relative(abs_path)
@@ -600,27 +685,27 @@ def run_batch(to_process: list[str], filtered: dict) -> dict:
             errors.append({"file": rel_path, "step": "copy", "error": str(e)})
             continue
 
-        # STEP 5: inbox-agent のパイプラインを呼び出す
-        # place-wiki.md に batch-inbox 専用フィールドを渡すことで:
-        #   - route-binary.md をスキップ（元ファイルは既に 00personal/ にある）
-        #   - processed-sources.yaml に source_path を確定値で記録
+        # STEP 5: パイプラインを呼び出す
+        # batch_mode=True により place-wiki は overview/changelog/index を
+        # 即時実行せず deferred_* リストに積んで返す
         pipeline_input = {
             "file_path":              inbox_copy,
-            # ── batch-inbox 専用フィールド ──
-            "original_personal_path": rel_path,   # 00personal 相対パス（source_path の確定値）
-            "file_hash":              file_hash,   # MD5 ハッシュ
-            "skip_route_binary":      True,        # route-binary.md をスキップ
+            "original_personal_path": rel_path,
+            "file_hash":              file_hash,
+            "skip_route_binary":      True,
+            "batch_mode":             True,       # ← 後処理を遅延させる
+            "wiki_detail_level":      wiki_detail_level,  # ← summary / full
         }
 
         pipeline_result = run_inbox_pipeline(pipeline_input)
-        # ↑ convert-binary → analyze → write-wiki → place-wiki の順に実行
+        # ↑ convert-binary → analyze → write-wiki → place-wiki（batch_mode）の順に実行
 
         # STEP 6: _inbox/ のコピーを削除
         try:
             if os.path.exists(inbox_copy):
                 os.remove(inbox_copy)
         except Exception:
-            pass   # 削除失敗は無視（次回実行時に削除される）
+            pass
 
         # 結果を記録
         if pipeline_result.get("status") == "skip":
@@ -639,14 +724,85 @@ def run_batch(to_process: list[str], filtered: dict) -> dict:
             label = "（更新）" if abs_path in filtered.get("updated", []) else ""
             results.append({"file": rel_path, "wiki_path": wiki_path, "label": label})
 
+            # 後処理キューに積む
+            dest_dir = os.path.dirname(
+                os.path.join(KB_ROOT, wiki_path)
+            )
+            deferred_overviews.add(dest_dir)
+            deferred_changelog.append(
+                f"[追加] {wiki_path}" + ("（更新）" if label else "")
+            )
+            deferred_wiki_paths.append(
+                os.path.join(KB_ROOT, wiki_path)
+            )
+
     return {
-        "status":       "success" if not errors else "partial",
-        "processed":    len(results),
-        "skipped":      len(skipped),
-        "errors":       len(errors),
-        "results":      results,
-        "skipped_list": skipped,
-        "error_list":   errors,
+        "status":               "success" if not errors else "partial",
+        "processed":            len(results),
+        "skipped":              len(skipped),
+        "errors":               len(errors),
+        "results":              results,
+        "skipped_list":         skipped,
+        "error_list":           errors,
+        # 後処理キュー（flush_batch_post_processing() へ渡す）
+        "deferred_overviews":   list(deferred_overviews),
+        "deferred_changelog":   deferred_changelog,
+        "deferred_wiki_paths":  deferred_wiki_paths,
+    }
+
+
+def flush_batch_post_processing(
+    deferred_overviews:  list[str],
+    deferred_changelog:  list[str],
+    deferred_wiki_paths: list[str],
+) -> dict:
+    """
+    run_batch() が収集した後処理を一括で実行する。
+
+    ① _overview.md の更新: 影響フォルダごとに1回だけ update-overview.md を呼ぶ
+    ② change_log への一括追記: 全エントリを1回のファイル書き込みで追記
+    ③ index-builder の一括実行: 全 wiki パスを渡して1回だけ呼ぶ
+
+    これにより、ファイルごとに3回発生していた後処理がまとめて3回になる。
+    """
+    flush_errors = []
+
+    # ① _overview.md 一括更新（影響フォルダ数分だけ実行）
+    for dest_dir in deferred_overviews:
+        overview_path = os.path.join(dest_dir, "_overview.md")
+        if os.path.exists(overview_path):
+            try:
+                update_overview_run(overview_path)   # update-overview.md スキルを呼ぶ
+            except Exception as e:
+                flush_errors.append({"step": "overview", "dir": dest_dir, "error": str(e)})
+
+    # ② change_log 一括追記（1回のファイル書き込み）
+    if deferred_changelog:
+        try:
+            today    = date.today()
+            log_path = os.path.join(
+                KB_ROOT, "_system",
+                f"change_log_{today.strftime('%Y-%m')}.md"
+            )
+            if not os.path.exists(log_path):
+                with open(log_path, "w", encoding="utf-8") as f:
+                    f.write(f"# KnowledgeBase 変更履歴 {today.strftime('%Y年%m月')}\n\n")
+            with open(log_path, "a", encoding="utf-8") as f:
+                for entry in deferred_changelog:
+                    f.write(f"- {today.strftime('%Y-%m-%d')} {entry}\n")
+        except Exception as e:
+            flush_errors.append({"step": "changelog", "error": str(e)})
+
+    # ③ index-builder 一括実行（全 wiki パスをまとめて渡す）
+    if deferred_wiki_paths:
+        try:
+            index_builder_run(mode="add_batch", file_paths=deferred_wiki_paths)
+        except Exception as e:
+            flush_errors.append({"step": "index_builder", "error": str(e)})
+
+    return {
+        "status": "success" if not flush_errors else "partial",
+        "errors": flush_errors,
     }
 
 
@@ -707,6 +863,7 @@ def run(
     max_files: int        = 10,
     wiki_filter: bool     = False,
     wiki_score_threshold: int = 6,
+    wiki_detail_level: str    = "summary",   # ← 追加
 ) -> dict:
     # 絶対パスに正規化
     if not os.path.isabs(target_dir):
@@ -760,13 +917,25 @@ def run(
     if not to_process:
         return {"status": "cancelled", "message": "処理をキャンセルしました"}
 
-    # STEP 4〜6: 処理実行
-    result = run_batch(to_process, filtered)
+    # STEP 4〜6: 処理実行（batch_mode=True で後処理を遅延）
+    result = run_batch(to_process, filtered, wiki_detail_level=wiki_detail_level)
     result["cloud_files"] = len(cloud_files)
     result["cloud_download_targets"] = len(cloud_result["download_targets"])
     result["cloud_downloaded"] = len(hydrate_result["downloaded"])
     result["cloud_download_failed"] = hydrate_result["failed"]
     result["cloud_skipped"] = cloud_result["skipped"]
+
+    # STEP 後処理: overview/changelog/index を一括実行（クレジット削減）
+    flush_result = flush_batch_post_processing(
+        deferred_overviews  = result.pop("deferred_overviews",  []),
+        deferred_changelog  = result.pop("deferred_changelog",  []),
+        deferred_wiki_paths = result.pop("deferred_wiki_paths", []),
+    )
+    if flush_result["errors"]:
+        result["error_list"].extend(flush_result["errors"])
+        result["errors"] += len(flush_result["errors"])
+        result["status"] = "partial"
+
     return result
 ```
 

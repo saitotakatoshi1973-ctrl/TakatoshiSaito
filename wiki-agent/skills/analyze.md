@@ -8,9 +8,16 @@
 4. `convert-binary.md` が必要か否か
 5. バイナリファイルの `00personal/` 移動先
 
-## 参照ファイル（必ず事前に読み込む）
+## 参照ファイル
+
 - `KnowledgeBase/_system/SCHEMA.md` — カテゴリ定義・分類ルール
 - `KnowledgeBase/_system/learning/classification-hints.md` — 補足分類ルール（学習済み）
+
+> **バッチ処理時の注意（クレジット削減）**:
+> `batch-inbox.md` から呼び出された場合、これらのファイルは
+> バッチ開始時に **1回だけ** 読み込み済みである。
+> ファイルごとに再読み込みしないこと（コンテキスト上のデータをそのまま使う）。
+> 単独で呼び出された場合（inbox-agent.md 経由など）のみ、ここで読み込む。
 
 ---
 
