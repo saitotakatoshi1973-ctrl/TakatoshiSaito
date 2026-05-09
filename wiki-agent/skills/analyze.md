@@ -159,6 +159,13 @@ source_url: "https://example.com/article"
 
 以下の順序で判定を進める。早い段階で確定したら以降はスキップしてよい。
 
+> **② バッチモード時のトークン削減**:
+> `pipeline_input.slim_schema` が渡されている場合、このステップでは
+> full SCHEMA.md（~2200トークン）の代わりに **slim_schema（~900トークン）を参照する**。
+> slim_schema は `batch-inbox.md` がバッチ開始時に SCHEMA.md から動的生成したもので、
+> フォルダパス一覧と vendor/research 境界ルールのみを含む。
+> `slim_schema` が None の場合は通常どおり full SCHEMA.md を参照する。
+
 ---
 
 ### 4-1: classification-hints.md パターン照合（最優先・高速）

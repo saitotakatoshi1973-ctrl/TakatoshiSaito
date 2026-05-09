@@ -115,18 +115,121 @@ def hydrate_cloud_file(path: str, timeout: int = 300, wait: int = 5) -> bool:
 # ── サブスキル（1回だけ読んでメモリに保持）──
 # Read: wiki-agent/skills/convert-binary.md
 # Read: wiki-agent/skills/analyze.md
-# Read: wiki-agent/skills/write-wiki.md
 # Read: wiki-agent/skills/place-wiki.md
+# ※ write-wiki.md は batch_write_wiki=True のため呼び出し不要（analyze.md が統合実行）
 
 # ── 分類ルール（全ファイル共通）──
-# Read: KnowledgeBase/_system/SCHEMA.md
+# Read: KnowledgeBase/_system/SCHEMA.md               ← full版（1回だけ読む）
 # Read: KnowledgeBase/_system/learning/classification-hints.md
+
+# ── ② スリム SCHEMA を動的生成（SCHEMA.md 読み込み直後に実行）──
+# slim_schema = generate_slim_schema(schema_content)
+# → analyze.md の STEP 4 では full SCHEMA.md の代わりに slim_schema を参照
+# → SCHEMA.md が更新されても次回バッチ時に自動追従（別ファイル管理不要）
 ```
 
 > **重要**: これらを `Skill()` ツールで呼び出さないこと。
 > `Skill()` は呼ぶたびにスキルファイル全文をコンテキストに注入するため、
 > バッチ処理でファイル数分だけクレジットを消費する。
 > 代わりに `Read` ツールで1回読み込み、以降はメモリ上の内容を再利用する。
+
+---
+
+## スリム SCHEMA 動的生成（② クレジット削減）
+
+SCHEMA.md を読み込んだ直後に `generate_slim_schema()` を呼び出す。
+full SCHEMA.md（~2200トークン）の代わりに slim 版（~900トークン）を
+analyze.md STEP 4 に渡すことで、1ファイルあたりの分類コストを約60%削減する。
+SCHEMA.md が更新されれば次回バッチ時に自動追従するため、別ファイル管理は不要。
+
+```python
+import re
+from datetime import date
+
+def generate_slim_schema(schema_content: str) -> str:
+    """
+    SCHEMA.md のコードブロック内 ASCII ツリーを解析し、
+    「フルパス : 説明1行」の一覧を動的生成する。
+
+    入力: SCHEMA.md の全文
+    出力: フォルダパス一覧 + vendor/research 境界ルール（~900トークン程度）
+
+    解析対象:
+      - 「KnowledgeBase/」で始まるブロック → トップカテゴリ一覧
+      - 各カテゴリ名で始まるブロック（kyorindo/ など）→ サブカテゴリ一覧
+    """
+    result = [
+        f"# KnowledgeBase フォルダパス一覧（SCHEMA.md から {date.today()} 自動生成）",
+        "",
+    ]
+
+    # コードブロック（```...```）を全て抽出
+    blocks = re.findall(r'```\n?(.*?)```', schema_content, re.DOTALL)
+
+    for block in blocks:
+        lines = block.strip().split('\n')
+        if not lines:
+            continue
+        first = lines[0].strip()
+
+        # ── パターン A: KnowledgeBase/ ブロック（トップカテゴリ一覧）──
+        if first == 'KnowledgeBase/':
+            for line in lines[1:]:
+                m = re.match(
+                    r'^[├└]──\s+([a-zA-Z0-9_-]+/)\s*(?:#\s*(.+))?$',
+                    line.strip()
+                )
+                if m and m.group(2):
+                    result.append(f"{m.group(1):<50} {m.group(2).strip()}")
+            result.append("")
+            continue
+
+        # ── パターン B: カテゴリブロック（kyorindo/ など）──
+        if not re.match(r'^[a-zA-Z][a-zA-Z0-9_-]*/$', first):
+            continue   # _system/ など対象外
+
+        top = first.rstrip('/')
+        path_stack: list[tuple[str, int]] = [(top, 0)]
+
+        for line in lines[1:]:
+            # ├── または └── で始まるフォルダ行（/ で終わる）を抽出
+            m = re.match(
+                r'^((?:│   |    )*)[├└]──\s+([a-zA-Z0-9_.{}\-]+/)\s*(?:#\s*(.+))?',
+                line
+            )
+            if not m:
+                continue
+
+            indent_s    = m.group(1)           # 例: "│   │   "
+            folder_name = m.group(2).rstrip('/')
+            comment     = (m.group(3) or "").strip()
+            depth       = len(indent_s) // 4 + 1  # 4文字/レベル
+
+            # path_stack を現在の深さに合わせてトリム
+            path_stack = [(p, d) for p, d in path_stack if d < depth]
+            path_stack.append((folder_name, depth))
+
+            full_path = '/'.join(p for p, d in path_stack) + '/'
+
+            if comment:
+                result.append(f"{full_path:<50} {comment}")
+            # コメントなしはパス構築用にスタックに保持するが出力はしない
+
+    # vendor / research 境界ルール（SCHEMA.md セクション4を要約）
+    result.extend([
+        "",
+        "## vendor / research 境界ルール",
+        "- ベンダー名で検索しそう（契約・見積・打ち合わせ記録）→ vendor/{vendor-name}/",
+        "- テーマ・技術名・講義内容で検索しそう → research/ または ai-dx/",
+    ])
+
+    return '\n'.join(result)
+
+
+# バッチ開始時に1回だけ実行:
+# schema_content = open(SCHEMA_PATH, encoding='utf-8').read()
+# slim_schema    = generate_slim_schema(schema_content)
+```
 
 ---
 
@@ -659,8 +762,9 @@ def show_preview(
 def run_batch(
     to_process: list[str],
     filtered: dict,
-    wiki_detail_level:   str  = "summary",
-    batch_auto_classify: bool = True,
+    wiki_detail_level:   str       = "summary",
+    batch_auto_classify: bool      = True,
+    slim_schema:         str|None  = None,    # ② 動的生成スリムSCHEMA
 ) -> dict:
     """
     to_process の各ファイルを wiki 化する。1ファイルずつ直列で処理する。
@@ -709,6 +813,7 @@ def run_batch(
             "batch_auto_classify":    batch_auto_classify, # ← 低信頼度自動進行
             "cached_text":            cached_texts.get(abs_path),  # ① キャッシュヒット時は変換スキップ
             "batch_write_wiki":       True,          # ① analyze + write-wiki を1回のLLM呼び出しに統合
+            "slim_schema":            slim_schema,   # ② 動的生成スリムSCHEMA（analyze STEP 4 で使用）
         }
         # ── パイプライン実行順序（batch_write_wiki=True 時）──
         # 1. convert-binary.md  → テキスト抽出（cached_text があればスキップ）
@@ -1023,6 +1128,17 @@ def run(
     if not os.path.isdir(target_dir):
         return {"status": "error", "message": f"フォルダが見つかりません: {target_dir}"}
 
+    # ② スリム SCHEMA を動的生成（バッチ開始時に1回だけ）
+    # SCHEMA.md を読み込み → フォルダパス一覧を抽出 → slim_schema として保持
+    # analyze.md STEP 4 では full SCHEMA.md の代わりにこれを参照する
+    SCHEMA_PATH = os.path.join(KB_ROOT, "_system", "SCHEMA.md")
+    try:
+        with open(SCHEMA_PATH, "r", encoding="utf-8") as f:
+            schema_content = f.read()
+        slim_schema = generate_slim_schema(schema_content)
+    except Exception:
+        slim_schema = None   # 生成失敗時は analyze.md が full SCHEMA.md を参照
+
     # STEP 1: スキャン（クラウド専用ファイルは後続で事前判定）
     scan_result = scan_target_dir(target_dir, recursive, file_types)
     all_files   = scan_result["local"]        # ローカルにあるファイル
@@ -1095,6 +1211,7 @@ def run(
         filtered,
         wiki_detail_level    = wiki_detail_level,
         batch_auto_classify  = batch_auto_classify,
+        slim_schema          = slim_schema,          # ② 動的生成スリムSCHEMA
     )
     result["cloud_files"] = len(cloud_files)
     result["cloud_download_targets"] = len(cloud_result["download_targets"])
