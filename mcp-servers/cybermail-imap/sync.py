@@ -1,0 +1,655 @@
+#!/usr/bin/env python3
+"""
+Cybermail Web API 差分同期スクリプト（UserPromptSubmit フック用）
+
+クールダウン時間（デフォルト60分）以内に同期済みの場合はスキップする。
+新着メールがある場合のみ標準出力に JSON で出力し、Claude のコンテキストに注入される。
+
+社内LANでIMAPポートがブロックされている場合でも、HTTPS(443)経由で動作する。
+"""
+
+import html
+import http.cookiejar
+import json
+import os
+import re
+import shutil
+import sqlite3
+import ssl
+import sys
+import urllib.parse
+import urllib.request
+from datetime import datetime
+from types import SimpleNamespace
+
+from mail_classifier import classify_mail, load_sender_rules
+
+
+# ---- 添付ファイル名抽出（server.py と同等）----
+
+def _extract_attachments(html_body: str) -> list[str]:
+    """Cybermail HTML レスポンスから添付ファイル名を抽出する"""
+    seen: set[str] = set()
+    result: list[str] = []
+
+    def _add(name: str) -> None:
+        name = name.strip()
+        if name and name not in seen:
+            seen.add(name)
+            result.append(name)
+
+    # パターン1: att_download リンクのテキストをファイル名として取得
+    for m in re.finditer(r'<a[^>]+cmd=att_download[^>]*>([^<]+)</a>', html_body, re.I):
+        _add(html.unescape(m.group(1)))
+
+    # パターン2: att_download URL の fname / filename パラメータ
+    for m in re.finditer(r'cmd=att_download[^"\']*[&;](?:fname|filename)=([^&"\'<>\s]+)', html_body, re.I):
+        _add(urllib.parse.unquote(m.group(1)))
+
+    # パターン3: JavaScript の rgAttInfo 配列（Cybermail 独自形式）
+    for block in re.findall(r'rgAttInfo\s*=\s*\[(.*?)\]', html_body, re.DOTALL):
+        for name in re.findall(r"'([^']+\.[A-Za-z0-9]{1,10})'", block):
+            _add(html.unescape(name))
+
+    # パターン4: Content-Disposition 的な記述
+    for m in re.finditer(r'filename=["\']([^"\'<>\s]+)["\']', html_body, re.I):
+        _add(html.unescape(m.group(1)))
+
+    return result
+
+_dir = os.path.dirname(os.path.abspath(__file__))
+ATTACHMENT_POLICY_METADATA_ONLY = "metadata_only"
+CYBERMAIL_FLAG_UNREAD = 0x00000100
+
+
+# ---- 日付パース（server.py と同等）----
+
+def _parse_full_date(sz_date: str, date_str: str) -> str:
+    """メール日時を YYYY-MM-DD HH:MM 形式に変換する。
+    szDate（年付き）を優先し、取得できない場合は date_str から年を補完する。
+    """
+    if sz_date:
+        m = re.search(r'(\d{4})[/-](\d{1,2})[/-](\d{1,2})\s+(\d{1,2}):(\d{2})', sz_date)
+        if m:
+            y, mo, d, h, mi = m.groups()
+            return f"{y}-{int(mo):02d}-{int(d):02d} {int(h):02d}:{mi}"
+        months = {"Jan":1,"Feb":2,"Mar":3,"Apr":4,"May":5,"Jun":6,
+                  "Jul":7,"Aug":8,"Sep":9,"Oct":10,"Nov":11,"Dec":12}
+        m = re.search(r'(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})\s+(\d{2}):(\d{2})', sz_date)
+        if m:
+            d, mon, y, h, mi = m.groups()
+            mo = months.get(mon, 1)
+            return f"{y}-{mo:02d}-{int(d):02d} {h}:{mi}"
+
+    if date_str:
+        m = re.search(r'(\d{1,2})/(\d{1,2})\s+(\d{1,2}):(\d{2})', date_str)
+        if m:
+            mo, d, h, mi = int(m.group(1)), int(m.group(2)), int(m.group(3)), m.group(4)
+            today = datetime.now()
+            year  = today.year
+            if mo > today.month or (mo == today.month and d > today.day):
+                year -= 1
+            return f"{year}-{mo:02d}-{d:02d} {h:02d}:{mi}"
+
+    return date_str or ""
+
+
+def _parse_db_mail_datetime(value: str) -> datetime | None:
+    """DB保存日時を比較用datetimeに変換する。"""
+    value = (value or "").strip()
+    if not value:
+        return None
+    normalized = value.replace("T", " ")
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M"):
+        try:
+            return datetime.strptime(normalized[:16 if fmt.endswith("%M") else 19], fmt)
+        except Exception:
+            pass
+    try:
+        return datetime.fromisoformat(value.replace("Z", "+00:00")).replace(tzinfo=None)
+    except Exception:
+        return None
+
+
+def _is_since_or_newer(date_value: str, since_date: str | None) -> bool:
+    """since_date未満のメールを同期対象から外す。"""
+    if not since_date:
+        return True
+    current = _parse_db_mail_datetime(date_value)
+    since = _parse_db_mail_datetime(since_date)
+    if current is None or since is None:
+        return True
+    return current >= since
+
+
+# ---- .env を手動読み込み（python-dotenv 未インストール環境でも動作）----
+
+def _load_env(path: str) -> None:
+    if not os.path.exists(path):
+        return
+    with open(path, encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, val = line.partition("=")
+            os.environ.setdefault(key.strip(), val.strip())
+
+
+_load_env(os.path.join(_dir, ".env"))
+
+WEB_HOST      = os.getenv("CYBERMAIL_HOST", "tsuruha.cybermail.jp")
+WEB_USER      = os.getenv("CYBERMAIL_USER", "")
+WEB_PASS      = os.getenv("CYBERMAIL_PASS", "")
+KB_PATH       = os.getenv("CYBERMAIL_KB_PATH", os.path.join(_dir, "kb", "emails.db"))
+COOLDOWN_MIN  = int(os.getenv("CYBERMAIL_SYNC_COOLDOWN_MINUTES", "60"))
+COOLDOWN_FILE = os.path.join(_dir, "kb", ".last_sync")
+BASE_URL      = f"https://{WEB_HOST}"
+MAX_PER_FOLDER = 200  # フック実行時は軽量に
+
+
+def _classify_cybermail(
+    rules: dict,
+    *,
+    mbox: str,
+    from_addr: str,
+    to_addr: str,
+    subject: str,
+    date: str,
+    body_text: str,
+    attachments: str | None,
+) -> SimpleNamespace:
+    try:
+        return classify_mail(
+            {
+                "source": "cybermail",
+                "folder": mbox,
+                "from_addr": from_addr,
+                "to_addr": to_addr,
+                "subject": subject,
+                "date": date,
+                "body_text": body_text,
+                "has_attachments": bool(attachments),
+            },
+            rules,
+        )
+    except Exception:
+        return SimpleNamespace(
+            classification="unknown",
+            sender_type="unknown",
+            save_policy="full" if body_text else "metadata_only",
+            attachment_policy=ATTACHMENT_POLICY_METADATA_ONLY,
+        )
+
+
+# ---- クールダウン管理 ----
+
+def _is_in_cooldown() -> bool:
+    """前回同期からクールダウン時間内かどうか確認する"""
+    if not os.path.exists(COOLDOWN_FILE):
+        return False
+    try:
+        with open(COOLDOWN_FILE) as f:
+            last = datetime.fromisoformat(f.read().strip())
+        elapsed_min = (datetime.now() - last).total_seconds() / 60
+        return elapsed_min < COOLDOWN_MIN
+    except Exception:
+        return False
+
+
+def _update_cooldown() -> None:
+    os.makedirs(os.path.dirname(COOLDOWN_FILE), exist_ok=True)
+    with open(COOLDOWN_FILE, "w") as f:
+        f.write(datetime.now().isoformat())
+
+
+# ---- データベース ----
+
+def _init_db(db_path: str) -> sqlite3.Connection:
+    os.makedirs(os.path.dirname(db_path), exist_ok=True)
+    conn = sqlite3.connect(db_path)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS folders (
+            mbox       TEXT PRIMARY KEY,
+            name       TEXT,
+            source     TEXT,
+            synced_at  TEXT
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS emails (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            msg_id      TEXT,
+            folder      TEXT,
+            from_addr   TEXT,
+            to_addr     TEXT,
+            cc_addr     TEXT,
+            subject     TEXT,
+            date        TEXT,
+            body_text   TEXT,
+            attachments TEXT,
+            attachment_policy TEXT,
+            source      TEXT,
+            classification TEXT,
+            sender_type TEXT,
+            save_policy TEXT,
+            synced_at   TEXT,
+            UNIQUE(msg_id, folder)
+        )
+    """)
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_emails_folder ON emails(folder)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_emails_date   ON emails(date)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_emails_from   ON emails(from_addr)")
+
+    # 既存 DB に attachments カラムがない場合は追加（マイグレーション）
+    cols = [row[1] for row in conn.execute("PRAGMA table_info(emails)").fetchall()]
+    schema_changes: list[str] = []
+    if "attachment_policy" not in cols:
+        schema_changes.append("attachment_policy")
+    if "attachments" not in cols:
+        schema_changes.append("attachments")
+    if "cc_addr" not in cols:
+        schema_changes.append("cc_addr")
+    if "source" not in cols:
+        schema_changes.append("source")
+    if "classification" not in cols:
+        schema_changes.append("classification")
+    if "sender_type" not in cols:
+        schema_changes.append("sender_type")
+    if "save_policy" not in cols:
+        schema_changes.append("save_policy")
+
+    folder_cols = [row[1] for row in conn.execute("PRAGMA table_info(folders)").fetchall()]
+    if "source" not in folder_cols:
+        schema_changes.append("folders.source")
+
+    if schema_changes and os.path.exists(db_path) and os.path.getsize(db_path) > 0:
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_path = f"{db_path}.bak_before_schema_{timestamp}"
+        shutil.copy2(db_path, backup_path)
+
+    if "attachments" not in cols:
+        conn.execute("ALTER TABLE emails ADD COLUMN attachments TEXT")
+    if "attachment_policy" not in cols:
+        conn.execute("ALTER TABLE emails ADD COLUMN attachment_policy TEXT")
+    if "cc_addr" not in cols:
+        conn.execute("ALTER TABLE emails ADD COLUMN cc_addr TEXT")
+    if "source" not in cols:
+        conn.execute("ALTER TABLE emails ADD COLUMN source TEXT")
+    if "classification" not in cols:
+        conn.execute("ALTER TABLE emails ADD COLUMN classification TEXT")
+    if "sender_type" not in cols:
+        conn.execute("ALTER TABLE emails ADD COLUMN sender_type TEXT")
+    if "save_policy" not in cols:
+        conn.execute("ALTER TABLE emails ADD COLUMN save_policy TEXT")
+
+    if "source" not in folder_cols:
+        conn.execute("ALTER TABLE folders ADD COLUMN source TEXT")
+
+    conn.execute("UPDATE emails SET source = 'cybermail' WHERE source IS NULL")
+    conn.execute(
+        "UPDATE emails SET attachment_policy = ? WHERE attachment_policy IS NULL AND attachments IS NOT NULL",
+        (ATTACHMENT_POLICY_METADATA_ONLY,),
+    )
+    conn.execute(
+        """UPDATE emails
+           SET save_policy = CASE
+               WHEN body_text IS NOT NULL AND body_text != '' THEN 'full'
+               ELSE 'metadata_only'
+           END
+           WHERE save_policy IS NULL""",
+    )
+    conn.execute("UPDATE folders SET source = 'cybermail' WHERE source IS NULL")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_emails_source ON emails(source)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_emails_classification ON emails(classification)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_emails_sender_type ON emails(sender_type)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_emails_save_policy ON emails(save_policy)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_folders_source ON folders(source)")
+
+    conn.commit()
+    return conn
+
+
+# ---- Cybermail HTTPS セッション（server.py の CybermailSession と同等）----
+
+class _Session:
+    def __init__(self):
+        self.crumb: str = ""
+        ssl_ctx = ssl.create_default_context()
+        jar = http.cookiejar.CookieJar()
+        self._opener = urllib.request.build_opener(
+            urllib.request.HTTPCookieProcessor(jar),
+            urllib.request.HTTPSHandler(context=ssl_ctx),
+        )
+
+    def _get(self, path: str, params: dict | None = None) -> str:
+        url = f"{BASE_URL}{path}"
+        if params:
+            url += "?" + urllib.parse.urlencode(params)
+        req = urllib.request.Request(
+            url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
+        )
+        r = self._opener.open(req, timeout=30)
+        return r.read().decode("utf-8", errors="replace")
+
+    def _post(self, path: str, data: dict) -> str:
+        url = f"{BASE_URL}{path}"
+        encoded = urllib.parse.urlencode(data).encode()
+        req = urllib.request.Request(
+            url,
+            data=encoded,
+            headers={
+                "Content-Type": "application/x-www-form-urlencoded",
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+                "Referer": f"{BASE_URL}/cgi-bin/login?index=1&lang=jp",
+            },
+        )
+        r = self._opener.open(req, timeout=30)
+        return r.read().decode("utf-8", errors="replace")
+
+    def login(self) -> bool:
+        self._get("/cgi-bin/login?index=1&lang=jp")
+        body = self._post(
+            "/cgi-bin/login",
+            {
+                "USERID": WEB_USER,
+                "PASSWD": WEB_PASS,
+                "lang": "jp",
+                "CLIENT_TOKEN": "",
+                "CHALLENGE": "",
+            },
+        )
+        m = re.search(r"crumb:\s*(\d+)", body)
+        if not m:
+            return False
+        self.crumb = m.group(1)
+        return True
+
+    def get_folders(self) -> list[dict]:
+        body = self._get(
+            "/cgi-bin/msg_list",
+            {"cmd": "show_list", "templ": "ajax", "mbox": "@", "msg_show": "1", "m": self.crumb},
+        )
+        folders: list[dict] = []
+        raw = re.search(r"rgFolderInfo:\s*\[(.*?)\n\],", body, re.DOTALL)
+        if raw:
+            for mbox, name in re.findall(r"\['([^']+)',\s*'[^']*',\s*'([^']*)'", raw.group(1)):
+                name_clean = re.sub(r"&#x[0-9A-Fa-f]+;", "", name).strip()
+                if mbox:
+                    folders.append({"mbox": mbox, "name": name_clean or mbox})
+        return folders
+
+    def get_email_list(self, mbox: str, max_count: int = 200) -> list[dict]:
+        body = self._get(
+            "/cgi-bin/msg_list",
+            {
+                "cmd": "show_list",
+                "templ": "ajax",
+                "mbox": mbox,
+                "msg_show": str(max_count),
+                "m": self.crumb,
+            },
+        )
+        emails: list[dict] = []
+        pattern = (
+            r'\[0,\s*\'([^\']+)\',\s*(\d+),\s*"([^"]*)",\s*'
+            r'\["([^"]*)",\s*"([^"]*)"\],\s*\'([^\']*)\''
+        )
+        for m in re.finditer(pattern, body):
+            flags = int(m.group(2))
+            emails.append(
+                {
+                    "msg_id":    m.group(1),
+                    "flags":     flags,
+                    "is_unread": bool(flags & CYBERMAIL_FLAG_UNREAD),
+                    "subject":   html.unescape(m.group(3)),
+                    "from_nick": html.unescape(m.group(4)),
+                    "from_addr": m.group(5),
+                    "date_str":  m.group(6),
+                }
+            )
+        return emails
+
+    def restore_unread(self, mbox: str, msg_id: str) -> None:
+        """本文取得で既読化されたメールを未読に戻す"""
+        self._post(
+            "/cgi-bin/msg_list",
+            {
+                "mbox":  mbox,
+                "templ": "ajax",
+                "X":     msg_id,
+                "tfid":  "",
+                "crumb": self.crumb,
+                "cmd":   "mail_op",
+                "opcmd": "tag",
+                "flag":  "0x00000100",
+                "unset": "0",
+                "m":     str(int(datetime.now().timestamp() * 1000)),
+            },
+        )
+
+    def get_email_body(self, mbox: str, msg_id: str, date_str: str = "") -> tuple[str, str, str, list[str], str]:
+        """メール本文を取得する。戻り値: (テキスト本文, 差出人, 宛先, 添付ファイル名リスト, 完全日時)"""
+        body = self._get(
+            "/cgi-bin/msg_read",
+            {
+                "cmd":    "mail_all",
+                "templ":  "dualbody",
+                "thm":    "1",
+                "m":      self.crumb,
+                "mbox":   mbox,
+                "msgid":  msg_id,
+                "notify": "0",  # 開封通知を送信しない
+                "type":   "0",
+                "reload": "1",
+                "crumb":  self.crumb,
+            },
+        )
+        from_m = re.search(r'szFrom="([^"]*)"', body)
+        to_m   = re.search(r'szTo="([^"]*)"',   body)
+        date_m = re.search(r'szDate="([^"]*)"', body)
+
+        from_full = html.unescape(from_m.group(1)) if from_m else ""
+        to_full   = html.unescape(to_m.group(1))   if to_m   else ""
+        sz_date   = html.unescape(date_m.group(1)) if date_m else ""
+
+        # 年付き完全日時に変換
+        full_date = _parse_full_date(sz_date, date_str)
+
+        # 添付ファイル名を抽出
+        attachments = _extract_attachments(body)
+
+        body_start = body.find("<body")
+        content = body[body_start:] if body_start >= 0 else body
+        content = re.sub(r"<script[^>]*>.*?</script>", "", content, flags=re.DOTALL | re.I)
+        content = re.sub(r"<style[^>]*>.*?</style>",   "", content, flags=re.DOTALL | re.I)
+        text = re.sub(r"<[^>]+>", "", content)
+        text = (
+            text.replace("&nbsp;", " ")
+                .replace("&lt;",   "<")
+                .replace("&gt;",   ">")
+                .replace("&amp;",  "&")
+                .replace("&quot;", '"')
+                .replace("&#39;",  "'")
+        )
+        text = re.sub(r"\n\s*\n\s*\n", "\n\n", text).strip()
+        return text, from_full, to_full, attachments, full_date
+
+    def logout(self):
+        try:
+            self._get("/cgi-bin/end", {"m": self.crumb})
+        except Exception:
+            pass
+
+
+# ---- フォルダ差分同期 ----
+
+def _sync_folder(
+    session: _Session,
+    mbox: str,
+    mbox_name: str,
+    db: sqlite3.Connection,
+    since_date: str | None = None,
+) -> int:
+    """1フォルダを差分同期する。追加件数を返す"""
+    try:
+        email_list = session.get_email_list(mbox, MAX_PER_FOLDER)
+        if not email_list:
+            db.execute(
+                "INSERT OR REPLACE INTO folders (mbox, name, source, synced_at) VALUES (?,?,?,?)",
+                (mbox, mbox_name, "cybermail", datetime.now().isoformat()),
+            )
+            db.commit()
+            return 0
+
+        existing = {
+            row[0]
+            for row in db.execute(
+                "SELECT msg_id FROM emails WHERE folder = ?", (mbox,)
+            ).fetchall()
+        }
+        new_emails = []
+        for entry in email_list:
+            if entry["msg_id"] in existing:
+                continue
+            list_date = _parse_full_date("", entry.get("date_str", "")) or entry.get("date_str", "")
+            if not _is_since_or_newer(list_date, since_date):
+                continue
+            new_emails.append(entry)
+
+        rules = load_sender_rules()
+        added = 0
+        for meta in new_emails:
+            try:
+                try:
+                    body_text, from_full, to_full, att_list, full_date = session.get_email_body(
+                        mbox, meta["msg_id"], meta["date_str"]
+                    )
+                finally:
+                    if meta.get("is_unread"):
+                        try:
+                            session.restore_unread(mbox, meta["msg_id"])
+                        except Exception:
+                            pass
+                from_addr   = from_full or meta["from_addr"]
+                attachments = json.dumps(att_list, ensure_ascii=False) if att_list else None
+                date        = full_date or meta["date_str"]
+            except Exception:
+                body_text   = ""
+                from_addr   = meta["from_addr"]
+                to_full     = ""
+                attachments = None
+                date        = _parse_full_date("", meta["date_str"]) or meta["date_str"]
+
+            classification = _classify_cybermail(
+                rules,
+                mbox=mbox,
+                from_addr=from_addr,
+                to_addr=to_full,
+                subject=meta["subject"],
+                date=date,
+                body_text=body_text,
+                attachments=attachments,
+            )
+
+            db.execute(
+                """INSERT OR IGNORE INTO emails
+                   (msg_id, folder, from_addr, to_addr, subject, date,
+                    body_text, attachments, attachment_policy, source,
+                    classification, sender_type, save_policy, synced_at)
+                   VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                (
+                    meta["msg_id"],
+                    mbox,
+                    from_addr[:200],
+                    to_full[:200],
+                    meta["subject"][:500],
+                    date,
+                    body_text[:50000],
+                    attachments,
+                    classification.attachment_policy,
+                    "cybermail",
+                    classification.classification,
+                    classification.sender_type,
+                    classification.save_policy,
+                    datetime.now().isoformat(),
+                ),
+            )
+            added += 1
+
+        db.execute(
+            "INSERT OR REPLACE INTO folders (mbox, name, source, synced_at) VALUES (?,?,?,?)",
+            (mbox, mbox_name, "cybermail", datetime.now().isoformat()),
+        )
+        db.commit()
+        return added
+
+    except Exception:
+        return 0
+
+
+# ---- メイン ----
+
+def main() -> None:
+    if _is_in_cooldown():
+        # クールダウン中はサイレントに終了（Claude への出力なし）
+        sys.exit(0)
+
+    if not WEB_USER or not WEB_PASS:
+        sys.exit(0)
+
+    try:
+        session = _Session()
+        if not session.login():
+            sys.exit(0)
+
+        all_folders = session.get_folders()
+        db = _init_db(KB_PATH)
+
+        # ゴミ箱・下書き・迷惑メール・アーカイブは同期対象外（送信BOXは含める）
+        SKIP_FOLDERS = {"@.trash", "@.draft", "@.spam", "@.06"}
+
+        total_added = 0
+        folder_results: dict[str, int] = {}
+
+        for fld in all_folders:
+            if fld["mbox"] in SKIP_FOLDERS:
+                continue
+            added = _sync_folder(session, fld["mbox"], fld["name"], db)
+            if added > 0:
+                folder_results[fld["name"]] = added
+                total_added += added
+
+        session.logout()
+        db.close()
+        _update_cooldown()
+
+        # 新着ありの場合のみ Claude のコンテキストに注入
+        if total_added > 0:
+            output = {
+                "cybermail_sync": {
+                    "status": "updated",
+                    "new_emails": total_added,
+                    "folders": folder_results,
+                    "synced_at": datetime.now().isoformat(),
+                    "message": (
+                        f"Cybermailに新着メールが{total_added}件あります。"
+                        "詳細は `cybermail_list_emails` ツールで確認できます。"
+                    ),
+                }
+            }
+            sys.stdout.buffer.write(
+                json.dumps(output, ensure_ascii=False, indent=2).encode("utf-8")
+            )
+            sys.stdout.buffer.write(b"\n")
+            sys.stdout.buffer.flush()
+
+    except Exception:
+        # エラーはサイレント（フックの失敗で Claude の起動を妨げない）
+        pass
+
+    sys.exit(0)
+
+
+if __name__ == "__main__":
+    main()

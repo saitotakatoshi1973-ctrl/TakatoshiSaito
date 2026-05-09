@@ -44,6 +44,7 @@ import yaml
 import hashlib
 import shutil
 import ctypes
+import time
 from datetime import date
 
 PERSONAL_ROOT  = r"C:\Users\takatoshi-saito\OneDrive\00personal"
@@ -74,6 +75,31 @@ def is_cloud_only(path: str) -> bool:
         return bool(attrs & (FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS | FILE_ATTRIBUTE_OFFLINE))
     except Exception:
         return False  # 判定失敗時は処理対象として扱う
+
+
+def hydrate_cloud_file(path: str, timeout: int = 300, wait: int = 5) -> bool:
+    """
+    OneDrive クラウド専用ファイルをローカルにダウンロードする。
+    ファイルを少量読み込むことで Files-on-Demand の取得を開始し、
+    クラウド専用属性が外れるまで待機する。
+    成功: True / 失敗: False
+    """
+    if not is_cloud_only(path):
+        return True
+
+    try:
+        with open(path, "rb") as f:
+            f.read(1)  # OneDrive のダウンロードを開始する
+    except Exception:
+        return False
+
+    start = time.time()
+    while time.time() - start < timeout:
+        if not is_cloud_only(path):
+            return True
+        time.sleep(wait)
+
+    return not is_cloud_only(path)
 ```
 
 ---
@@ -94,7 +120,7 @@ def scan_target_dir(
 
     戻り値: {
         "local":      list[str],  # ローカルにあるファイル（処理対象）
-        "cloud_only": list[str],  # クラウド専用のためスキップ
+        "cloud_only": list[str],  # クラウド専用。後続でファイル名から対象判定する
     }
     """
     local      = []
@@ -128,7 +154,114 @@ def scan_target_dir(
 
 ---
 
-## STEP 1.5: wiki化価値をスクリーニングする（wiki_filter=true 時のみ）
+## STEP 1.5: クラウド専用ファイルをファイル名で事前判定・ダウンロードする
+
+`scan_target_dir()` で `cloud_only` に分類されたファイルは、本文を読めないため、
+**ファイル名・フォルダパスだけ**で wiki 化対象かを判定する。
+
+対象と判定したファイルだけを OneDrive からローカルへダウンロードし、
+成功したものは通常の `local` ファイルと同じ処理フローに合流させる。
+
+### LLM へのクラウド専用ファイル判定指示
+
+```
+以下は OneDrive 上には存在するが、まだローカルにダウンロードされていないファイル一覧です。
+ファイル名とフォルダパスのみから、それぞれの「wikiナレッジとしての価値」を 0〜10 で評価してください。
+
+【評価基準】
+高評価（7〜10）:
+  - 状況・一覧・台数・導入状況などの管理資料
+  - 戦略・方針・設計・仕様を記した資料
+  - 業界動向・競合情報・調査レポート
+  - 会議記録・進捗サマリー
+  - 現在も参照価値がある技術情報（構成図・アーキテクチャ等）
+  - 見積書・相見積、発注書、納品書など調達履歴として価値がある資料
+
+低評価（0〜4）:
+  - 古い機器マニュアル・製品PDF単体
+  - スキャン画像・申請書・テンプレート・POP
+  - ファイル名から内容が明らかに低価値、または用途不明なもの
+
+【ファイル一覧】
+{cloud_only_files をパスとともに列挙}
+
+【出力形式（YAML）】
+- path: "ファイル絶対パス"
+  score: 8
+  decision: "download"   # download | skip
+  reason: "（1行で理由）"
+```
+
+### クラウド専用ファイルの処理
+
+```python
+def screen_cloud_files_by_name(
+    cloud_files: list[str],
+    score_threshold: int = 6,
+    batch_size: int = 30,
+) -> dict:
+    """
+    クラウド専用ファイルをファイル名・フォルダパスのみで評価する。
+
+    戻り値: {
+        "download_targets": list[dict],  # ダウンロード対象（score >= threshold）
+        "skipped": list[dict],           # 低スコアのためスキップ
+    }
+    """
+    download_targets = []
+    skipped = []
+
+    for i in range(0, len(cloud_files), batch_size):
+        batch = cloud_files[i:i + batch_size]
+        scores = llm_score_cloud_file_names(batch)
+
+        for item in scores:
+            if item["score"] >= score_threshold and item.get("decision") == "download":
+                download_targets.append(item)
+            else:
+                skipped.append(item)
+
+    return {"download_targets": download_targets, "skipped": skipped}
+
+
+def hydrate_selected_cloud_files(download_targets: list[dict]) -> dict:
+    """
+    判定済みのクラウド専用ファイルをローカルにダウンロードする。
+
+    戻り値: {
+        "downloaded": list[str],  # ローカル化成功。通常処理へ合流
+        "failed": list[dict],     # ダウンロード失敗
+    }
+    """
+    downloaded = []
+    failed = []
+
+    for item in download_targets:
+        path = item["path"]
+        ok = hydrate_cloud_file(path)
+        if ok:
+            downloaded.append(path)
+        else:
+            failed.append({
+                "path": path,
+                "score": item.get("score"),
+                "reason": item.get("reason", "ダウンロード失敗"),
+            })
+
+    return {"downloaded": downloaded, "failed": failed}
+```
+
+### クラウド専用ファイルの扱い
+
+| 判定 | 処理 |
+|------|------|
+| score >= threshold かつ decision: download | OneDriveからローカルにダウンロードし、成功したら通常処理へ合流 |
+| score < threshold または decision: skip | wiki化対象外としてスキップ |
+| ダウンロード失敗 | エラーではなく `cloud_download_failed` として結果に記録し、次回再処理可能にする |
+
+---
+
+## STEP 1.6: wiki化価値をスクリーニングする（wiki_filter=true 時のみ）
 
 `wiki_filter=true` の場合、ファイル名とフォルダパスをもとに LLM が wiki 化価値を
 0〜10 でスコアリングし、`wiki_score_threshold`（デフォルト6）未満のファイルを除外する。
@@ -209,12 +342,10 @@ def pre_screen_wiki_value(
 ```
 🔍 wiki_filter スクリーニング結果
 
-スキャン: 72件 → ローカル: 68件 / ☁️クラウド専用スキップ: 4件
-         採用: 8件 / 除外: 60件
-
-【☁️クラウド専用スキップ（未ダウンロード）】
-  ☁️ 旧システム仕様書.pdf
-  ☁️ 他3件
+スキャン: 72件 → ローカル: 68件 / ☁️クラウド専用: 4件
+         クラウド判定: ダウンロード対象2件 / スキップ2件
+         ダウンロード成功: 2件 / 失敗0件
+         採用: 10件 / 除外: 60件
 
 【採用（score ≥ 6）】
   ✅ KP-20プリンタの状況説明資料2018.xlsx         [score: 8] 状況管理資料
@@ -225,6 +356,7 @@ def pre_screen_wiki_value(
   ✅ レジロール各店発注実績_20240703-20250328.xlsx  [score: 6] 実績データ（直近）
   ✅ WebEX面会設定方法.pdf                        [score: 6] 現行システム手順書
   ✅ TV会議システム2拠点.pdf                      [score: 6] システム構成情報
+  ☁️→✅ 重要システム構成図_2024.pdf                [score: 8] クラウドから取得
 
 【除外（score < 6）の主な理由】
   ❌ 古いBHT操作マニュアル（5件）: 旧機器PDF
@@ -538,6 +670,11 @@ def _resolve_collision(dest_path: str) -> str:
 
 対象フォルダ: 03_CX推進/01_戦略/
 ────────────────────────────
+クラウド専用:  4件
+  - ダウンロード対象: 2件
+  - ダウンロード成功: 2件
+  - スキップ: 2件
+  - 失敗: 0件
 処理成功:      7件
 内容更新:      1件（wiki を上書き更新）
 スキップ:      1件（ユーザーが分類確認でスキップ）
@@ -578,15 +715,33 @@ def run(
     if not os.path.isdir(target_dir):
         return {"status": "error", "message": f"フォルダが見つかりません: {target_dir}"}
 
-    # STEP 1: スキャン（クラウド専用ファイルは自動スキップ）
+    # STEP 1: スキャン（クラウド専用ファイルは後続で事前判定）
     scan_result = scan_target_dir(target_dir, recursive, file_types)
-    all_files   = scan_result["local"]       # ローカルにあるファイルのみ処理対象
-    cloud_skipped = scan_result["cloud_only"]  # ☁️ クラウド専用スキップ件数（ログ用）
+    all_files   = scan_result["local"]        # ローカルにあるファイル
+    cloud_files = scan_result["cloud_only"]   # ☁️ クラウド専用ファイル
 
-    if cloud_skipped:
-        print(f"☁️ クラウド専用スキップ: {len(cloud_skipped)}件（未ダウンロード）")
+    cloud_result = {"download_targets": [], "skipped": []}
+    hydrate_result = {"downloaded": [], "failed": []}
 
-    # STEP 1.5: wiki_filter=True の場合は LLM スクリーニング
+    # STEP 1.5: クラウド専用ファイルはファイル名・パスだけで対象判定し、
+    # 対象であればローカルにダウンロードして通常処理へ合流させる
+    if cloud_files:
+        cloud_result = screen_cloud_files_by_name(
+            cloud_files,
+            score_threshold=wiki_score_threshold,
+        )
+        hydrate_result = hydrate_selected_cloud_files(cloud_result["download_targets"])
+        all_files += hydrate_result["downloaded"]
+
+        print(
+            f"☁️ クラウド専用: {len(cloud_files)}件 / "
+            f"ダウンロード対象: {len(cloud_result['download_targets'])}件 / "
+            f"成功: {len(hydrate_result['downloaded'])}件 / "
+            f"失敗: {len(hydrate_result['failed'])}件 / "
+            f"スキップ: {len(cloud_result['skipped'])}件"
+        )
+
+    # STEP 1.6: wiki_filter=True の場合は LLM スクリーニング
     screen_result = None
     if wiki_filter and all_files:
         screen_result = pre_screen_wiki_value(all_files, wiki_score_threshold)
@@ -606,7 +761,13 @@ def run(
         return {"status": "cancelled", "message": "処理をキャンセルしました"}
 
     # STEP 4〜6: 処理実行
-    return run_batch(to_process, filtered)
+    result = run_batch(to_process, filtered)
+    result["cloud_files"] = len(cloud_files)
+    result["cloud_download_targets"] = len(cloud_result["download_targets"])
+    result["cloud_downloaded"] = len(hydrate_result["downloaded"])
+    result["cloud_download_failed"] = hydrate_result["failed"]
+    result["cloud_skipped"] = cloud_result["skipped"]
+    return result
 ```
 
 ---
@@ -616,7 +777,8 @@ def run(
 | 発生箇所 | 対処 |
 |---------|------|
 | フォルダが存在しない | エラーを返してスキップ |
-| **OneDriveクラウド専用ファイル（未ダウンロード）** | **STEP 1 で `cloud_only` に分類し処理対象外とする（スキップ）** |
+| OneDriveクラウド専用ファイル（未ダウンロード） | STEP 1.5 でファイル名・パスから対象判定。対象ならダウンロードして通常処理へ合流、低スコアならスキップ |
+| クラウド専用ファイルのダウンロード失敗 | `cloud_download_failed` に記録してスキップ。次回再処理可能 |
 | ハッシュ計算失敗（その他 I/O エラー） | 空文字として未処理扱いで続行 |
 | _inbox/ へのコピー失敗 | エラーリストに記録してスキップ |
 | パイプライン処理失敗 | エラーリストに記録。_inbox コピーは削除 |

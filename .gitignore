@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Node.js
+node_modules/
+dist/
+build/
+
+# Environment / secrets
+.env
+.env.*
+
+# Logs / temporary files
+*.log
+*.tmp
+*.bak
+.cache/
+.pytest_cache/
+.mypy_cache/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+
+# Cybermail generated data
+mcp-servers/cybermail-imap/kb/emails.db
+mcp-servers/cybermail-imap/kb/emails.db.bak_before_mail_sync_all_*
+mcp-servers/cybermail-imap/kb/*.bak_before_*
+mcp-servers/cybermail-imap/kb/.last_sync
+mcp-servers/cybermail-imap/logs/mail_sync_all_latest.json
+mcp-servers/cybermail-imap/logs/mail_sync_all_*.json
+mcp-servers/cybermail-imap/outputs/
+mcp-servers/cybermail-imap/outlook_web_profile/
+mcp-servers/cybermail-imap/owa_folders_cache.json
+mcp-servers/cybermail-imap/owa_token_cache.json
+
+# Claude generated worktrees
+.claude/worktrees/
