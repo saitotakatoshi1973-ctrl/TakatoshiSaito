@@ -45,6 +45,29 @@ def safe_open(file_path, mode='rb', retries=3, wait=5):
 
 ---
 
+## STEP 0: キャッシュチェック（クレジット削減）
+
+バッチ処理時、**呼び出し元（batch-inbox.md）から `cached_text` が渡された場合は変換をスキップ**する。
+ファイルハッシュが一致している再処理（partial）のとき、前回の変換結果を再利用できる。
+
+```python
+def convert_binary_with_cache(file_path: str, cached_text: str | None = None) -> str:
+    """
+    cached_text が渡された場合は変換せずそのまま返す（クレジット削減）。
+    cached_text が None の場合は通常の convert_binary() を呼び出す。
+    """
+    if cached_text:
+        return cached_text   # キャッシュヒット: Bash 実行不要
+    return convert_binary(file_path)
+```
+
+> **pipeline_input への対応**:
+> `pipeline_input["cached_text"]` が存在・非空の場合は `convert_binary()` を実行しないこと。
+> キャッシュを使った場合も、`pipeline_result["extracted_text"]` に同じテキストを格納して返す。
+> キャッシュなし（通常変換）の場合も、変換結果を `pipeline_result["extracted_text"]` に含めること。
+
+---
+
 ## STEP 1: ファイル種別判定
 
 ```python

@@ -419,7 +419,7 @@ def pre_screen_wiki_value(
 スキャン: 72件 → ローカル: 68件 / ☁️クラウド専用: 4件
          クラウド判定: ダウンロード対象2件 / スキップ2件
          ダウンロード成功: 2件 / 失敗0件
-         採用: 10件 / 除外: 60件
+         採用: 10件 / 除外: 60件（うちキャッシュ済みスキップ: 45件）③
 
 【採用（score ≥ 6）】
   ✅ KP-20プリンタの状況説明資料2018.xlsx         [score: 8] 状況管理資料
@@ -499,7 +499,7 @@ def filter_files(files: list[str]) -> dict:
       - binary_moved が False（"skipped" は正常終了なので除外）
     """
     processed = load_processed_sources()
-    result = {"new": [], "updated": [], "partial": [], "done": []}
+    result = {"new": [], "updated": [], "partial": [], "done": [], "cached_texts": {}}
 
     for abs_path in files:
         rel_path = to_personal_relative(abs_path)
@@ -521,6 +521,9 @@ def filter_files(files: list[str]) -> dict:
         ):
             # 部分失敗 → 再処理
             result["partial"].append(abs_path)
+            # ① ハッシュ一致 = ファイル内容は同じ → 変換テキストキャッシュを再利用
+            if record.get("extracted_text"):
+                result["cached_texts"][abs_path] = record["extracted_text"]
         else:
             # 完全成功済み → スキップ
             result["done"].append(abs_path)
@@ -670,6 +673,7 @@ def run_batch(
     auto_classified_list に記録する（バッチ後にまとめてレビュー可能）。
     """
     auto_classified = []   # 低信頼度で自動進行したファイルのリスト
+    cached_texts = filtered.get("cached_texts", {})  # ① 変換テキストキャッシュ（partial再処理時に再利用）
     results      = []
     skipped      = []
     errors       = []
@@ -703,7 +707,11 @@ def run_batch(
             "batch_mode":             True,          # ← 後処理を遅延させる
             "wiki_detail_level":      wiki_detail_level,   # ← summary / full
             "batch_auto_classify":    batch_auto_classify, # ← 低信頼度自動進行
+            "cached_text":            cached_texts.get(abs_path),  # ① キャッシュヒット時は変換スキップ
         }
+        # pipeline_result に期待するフィールド:
+        #   status / wiki_path / processed_record / auto_classified / confidence_score / destination
+        #   extracted_text: convert-binary の出力テキスト（キャッシュ用・3000文字まで）← ①で追加
 
         pipeline_result = run_inbox_pipeline(pipeline_input)
         # ↑ convert-binary → analyze → write-wiki → place-wiki（batch_mode）の順に実行
@@ -753,7 +761,12 @@ def run_batch(
             )
             # processed-sources.yaml レコードもバッファに積む（一括書き込み用）
             if "processed_record" in pipeline_result:
-                deferred_ps_records.append(pipeline_result["processed_record"])
+                record = pipeline_result["processed_record"]
+                # ① 変換テキストをキャッシュとして保存（3000文字まで）
+                # 次回 partial 再処理時に convert-binary をスキップできる
+                if "extracted_text" not in record and pipeline_result.get("extracted_text"):
+                    record["extracted_text"] = pipeline_result["extracted_text"][:3000]
+                deferred_ps_records.append(record)
 
     return {
         "auto_classified_list": auto_classified,  # バッチ完了後レビュー用
@@ -885,6 +898,51 @@ def upsert_all_processed_records(records: list[dict]) -> None:
                 raise RuntimeError("processed-sources.yaml への一括書き込みに失敗しました")
 
 
+def load_filter_rejection_cache() -> dict[str, str]:
+    """
+    wiki_filter で過去にスキップ判定されたファイルを {rel_path: file_hash} で返す。
+    ハッシュが一致する場合のみキャッシュ有効（ファイル更新時は再スコアリング）。
+    """
+    processed = load_processed_sources()
+    return {
+        sp: record.get("file_hash", "")
+        for sp, record in processed.items()
+        if record.get("wiki_filter_result") == "skip"
+    }
+
+
+def save_filter_rejections(filtered_items: list[dict]) -> None:
+    """
+    wiki_filter で新たに除外判定したファイルを processed-sources.yaml にキャッシュとして記録する。
+    次回バッチ時、ハッシュが一致するファイルは LLM スコアリングをスキップできる。
+
+    filtered_items: pre_screen_wiki_value の "filtered" リスト
+    ルールベース除外（score フィールドなし）はスキップする。
+    """
+    today   = date.today().strftime("%Y-%m-%d")
+    records = []
+    for item in filtered_items:
+        if "score" not in item:
+            continue   # ルールベース除外はキャッシュ不要（次回もルールで除外される）
+        path = item.get("path", "")
+        if not path:
+            continue
+        rel_path  = to_personal_relative(path)
+        file_hash = compute_file_hash(path)
+        records.append({
+            "source_path":        rel_path,
+            "file_hash":          file_hash,
+            "wiki_filter_result": "skip",
+            "wiki_filter_score":  item.get("score", 0),
+            "wiki_filter_date":   today,
+            "wiki_path":          None,
+            "index_registered":   False,
+            "binary_moved":       "skipped",
+        })
+    if records:
+        upsert_all_processed_records(records)
+
+
 def _resolve_collision(dest_path: str) -> str:
     """同名ファイルが _inbox/ に存在する場合 _v2/_v3 を付与する"""
     if not os.path.exists(dest_path):
@@ -987,8 +1045,29 @@ def run(
     # STEP 1.6: wiki_filter=True の場合は LLM スクリーニング
     screen_result = None
     if wiki_filter and all_files:
-        screen_result = pre_screen_wiki_value(all_files, wiki_score_threshold)
+        # ③ スクリーニング結果キャッシュ: 前回スキップ済みファイルをLLM呼び出し前に除外
+        rejection_cache = load_filter_rejection_cache()
+        uncached_files  = []
+        pre_cached_skip = []
+        for f in all_files:
+            rel       = to_personal_relative(f)
+            cached_h  = rejection_cache.get(rel)
+            if cached_h and cached_h == compute_file_hash(f):
+                # ハッシュ一致 → 前回と同じファイル。LLMスコアリング不要
+                pre_cached_skip.append({"path": f, "reason": "キャッシュ済み除外（前回スキップ）"})
+            else:
+                uncached_files.append(f)
+
+        screen_result = pre_screen_wiki_value(uncached_files, wiki_score_threshold)
+
+        # キャッシュ済みスキップを filtered に合算して表示統計に反映
+        screen_result["filtered"].extend(pre_cached_skip)
         all_files = screen_result["passed"]   # 採用ファイルのみ以降の処理へ
+
+        # 今回新たにLLMがスキップ判定したファイルをキャッシュに保存（次回再スコアリング不要）
+        newly_rejected = [item for item in screen_result["filtered"] if "score" in item]
+        if newly_rejected:
+            save_filter_rejections(newly_rejected)
 
     # STEP 2.5: 削除検出 → ユーザー確認
     deleted = detect_deleted_sources(target_dir, all_files)

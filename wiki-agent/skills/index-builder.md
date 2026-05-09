@@ -12,6 +12,7 @@
 | モード | 呼び出し元 | 動作 |
 |--------|-----------|------|
 | `add` | `place-wiki.md`（都度） | 新規ファイルのembeddingを追加 ＋ 欠損チェック |
+| `batch_add` | `flush_batch_post_processing()`（バッチ末尾） | 複数ファイルを npz load/save 各1回で一括追加 ② |
 | `rebuild` | `maintenance-agent`（週次） | KnowledgeBase/ 全体を走査して全件再構築 |
 
 ---
@@ -198,6 +199,69 @@ def add_to_index(model: SentenceTransformer, file_path: str) -> dict:
 
 ---
 
+## STEP 5-A2: バッチ追加モード（batch_add）
+
+`place-wiki.md` から1件ずつ呼ばれる `add` モードに代わり、
+バッチ処理終了後に **まとめて1回** npz を更新するモード。
+`flush_batch_post_processing()` から呼び出される。
+
+```python
+def batch_add_to_index(model: SentenceTransformer, file_paths: list[str]) -> dict:
+    """
+    複数の wiki ファイルを index に一括追加する。
+    npz の load / save を各1回で済ませる（add を n 回呼ぶより大幅に I/O 削減）。
+
+    file_paths: KnowledgeBase/ 配下の絶対パスリスト
+    """
+    # 既存 index を1回だけ読み込み
+    paths, embeddings = load_index()
+    paths, embeddings = remove_missing(paths, embeddings)
+
+    added   = []
+    skipped = []
+
+    for file_path in file_paths:
+        if not os.path.exists(file_path):
+            skipped.append({"path": file_path, "reason": "ファイルが存在しない"})
+            continue
+
+        rel_path = os.path.relpath(file_path, KB_ROOT).replace("\\", "/")
+
+        # 既に登録済みの場合は上書き更新（削除してから再追加）
+        if rel_path in paths:
+            idx = paths.index(rel_path)
+            paths.pop(idx)
+            embeddings = np.delete(embeddings, idx, axis=0)
+
+        text = extract_embed_text(file_path)
+        if not text:
+            skipped.append({"path": rel_path, "reason": "テキスト抽出失敗"})
+            continue
+
+        new_emb = model.encode(text, normalize_embeddings=True).astype(np.float32)
+        paths.append(rel_path)
+        if embeddings.shape[0] == 0:
+            embeddings = new_emb.reshape(1, -1)
+        else:
+            embeddings = np.vstack([embeddings, new_emb.reshape(1, -1)])
+        added.append(rel_path)
+
+    # 全件追加後に1回だけ保存
+    if added:
+        save_index(paths, embeddings)
+
+    return {
+        "status": "success",
+        "mode": "batch_add",
+        "added": len(added),
+        "skipped": len(skipped),
+        "total_entries": len(paths),
+        "skipped_files": skipped,
+    }
+```
+
+---
+
 ## STEP 5-B: 全件再構築モード（rebuild）
 
 ```python
@@ -282,11 +346,12 @@ def save_index(paths: list[str], embeddings: np.ndarray, retries: int = 3, wait:
 ## STEP 7: メイン呼び出し関数
 
 ```python
-def run(mode: str, file_path: str = None) -> dict:
+def run(mode: str, file_path: str = None, file_paths: list[str] = None) -> dict:
     """
     index-builder.md のエントリポイント。
-    mode: "add" | "rebuild"
-    file_path: add モード時のみ必要（絶対パス）
+    mode: "add" | "batch_add" | "rebuild"
+    file_path:  add モード時のみ必要（絶対パス）
+    file_paths: batch_add モード時のみ必要（絶対パスリスト）
     """
     model = load_model()
 
@@ -294,6 +359,13 @@ def run(mode: str, file_path: str = None) -> dict:
         if not file_path or not os.path.exists(file_path):
             return {"status": "error", "reason": f"ファイルが存在しません: {file_path}"}
         return add_to_index(model, file_path)
+
+    elif mode == "batch_add":
+        # ② バッチ追加モード: flush_batch_post_processing() から呼び出される
+        # npz の load/save を1回に集約し、n 件追加でも I/O コストを O(1) に抑える
+        if not file_paths:
+            return {"status": "skipped", "reason": "file_paths が空"}
+        return batch_add_to_index(model, file_paths)
 
     elif mode == "rebuild":
         return rebuild_index(model)
@@ -312,6 +384,13 @@ status: success
 mode: add
 path: "kyorindo/cx/strategy/CX推進ロードマップ_v4_20260501.md"
 total_entries: 87
+
+# バッチ追加モードの場合（② flush_batch_post_processing から呼び出し）
+status: success
+mode: batch_add
+added: 8
+skipped: 0
+total_entries: 95
 
 # 全件再構築モードの場合
 status: success
