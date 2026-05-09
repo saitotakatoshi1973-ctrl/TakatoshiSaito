@@ -33,6 +33,37 @@ batch_mode: false         # True の場合 STEP 1（overview更新）/STEP 2（c
                           # → batch-inbox.md の flush_batch_post_processing() で一括実行
 ```
 
+### batch_write_wiki=True 時の特別な入力（① analyze + write-wiki 統合モード）
+
+`batch_write_wiki=True` の場合、`write-wiki.md` は呼び出されない。
+代わりに **`analyze.md` STEP 6 統合モードの出力**がそのまま渡される。
+
+```yaml
+# analyze.md 統合モードからの入力
+analyze_result:
+  destination: "kyorindo/cx/strategy/"
+  front_matter:
+    wiki_type: "strategy"
+    title: "CX推進ロードマップ v4"
+    scope: "kyorindo"
+    domain: "cx"
+    status: current
+    source: agent
+    tags: []
+  classification_confidence: high
+wiki_content: |
+  ## 概要
+  （analyze.md が生成した wiki 本文）
+  ...
+original_personal_path: "..."
+file_hash: "..."
+skip_route_binary: true
+batch_mode: true
+batch_write_wiki: true
+```
+
+`batch_write_wiki=True` の場合、本スキルの STEP 0 でファイルの保存（write-wiki.md STEP 4 相当）を実行してから、STEP 1 以降の後処理へ進む。
+
 ---
 
 ## batch_mode での動作（クレジット削減）
@@ -52,6 +83,74 @@ batch_mode: false         # True の場合 STEP 1（overview更新）/STEP 2（c
 ```python
 # batch_mode フラグの確認（各ステップで参照）
 batch_mode = input_yaml.get("batch_mode", False)
+```
+
+---
+
+## STEP 0: batch_write_wiki=True 時のwikiファイル保存（① 統合モード専用）
+
+`batch_write_wiki=True` の場合のみ実行。
+`write-wiki.md` が実行されていないため、このステップで wiki ファイルを保存する。
+
+```python
+def save_wiki_from_combined(analyze_result: dict, wiki_content: str) -> str:
+    """
+    analyze.md 統合モードの出力から wiki ファイルを保存する。
+    write-wiki.md STEP 1〜4 相当の処理を実行する。
+    戻り値: 保存した絶対パス
+    """
+    fm_data       = analyze_result["front_matter"]
+    destination   = analyze_result["destination"]
+    title         = fm_data["title"]
+    today         = date.today().strftime("%Y-%m-%d")
+
+    # ファイル名生成（write-wiki.md STEP 1 相当）
+    safe_title = re.sub(r'[\\/:*?"<>|]', '_', title).strip()
+    filename   = f"{safe_title}_{date.today().strftime('%Y%m%d')}.md"
+
+    # 衝突チェック
+    dest_dir = os.path.join(KB_ROOT, destination)
+    os.makedirs(dest_dir, exist_ok=True)
+    stem, ext = os.path.splitext(filename)
+    version = 2
+    while os.path.exists(os.path.join(dest_dir, filename)):
+        filename = f"{stem}_v{version}{ext}"
+        version += 1
+
+    # Front-matter 生成（write-wiki.md STEP 2 相当）
+    tags_str = "\n".join([f'  - "{t}"' for t in fm_data.get("tags", [])])
+    frontmatter = f"""---
+wiki_type: {fm_data["wiki_type"]}
+title: "{title}"
+aliases: []
+created: {today}
+updated: {today}
+source: {fm_data.get("source", "agent")}
+source_url: "{fm_data.get("source_url", "")}"
+tags:
+{tags_str}
+scope: {fm_data["scope"]}
+domain: {fm_data["domain"]}
+status: {fm_data.get("status", "current")}
+related: []
+---"""
+
+    # ファイル保存
+    content   = frontmatter + "\n\n" + wiki_content
+    file_path = os.path.join(dest_dir, filename)
+    with open(file_path, "w", encoding="utf-8") as f:
+        f.write(content)
+
+    return file_path
+
+
+# batch_write_wiki=True 時の分岐
+if input_yaml.get("batch_write_wiki", False):
+    saved_path = save_wiki_from_combined(
+        analyze_result = input_yaml["analyze_result"],
+        wiki_content   = input_yaml["wiki_content"],
+    )
+    # 以降の STEP 1〜4 は saved_path を参照して通常通り実行
 ```
 
 ---

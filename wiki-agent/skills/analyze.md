@@ -380,7 +380,13 @@ if batch_auto_classify and confidence_score < 6:
 
 ## STEP 6: 分析結果の出力
 
-以下のYAML形式で判定結果を出力し、次のスキルへ渡す。
+`pipeline_input.batch_write_wiki` フラグによって出力形式が変わる。
+
+---
+
+### 通常モード（batch_write_wiki=False または未指定）
+
+以下のYAML形式で判定結果を出力し、次のスキル（`write-wiki.md`）へ渡す。
 
 ```yaml
 file: （ファイル名）
@@ -400,6 +406,54 @@ front_matter:
 classification_confidence: high | medium | low
 classification_method: hints | llm_score | embedding | user
 ```
+
+---
+
+### バッチ統合モード（batch_write_wiki=True）① **クレジット削減**
+
+`write-wiki.md` を別呼び出ししない。
+**分類結果 ＋ wiki本文を1回のレスポンスで同時出力する。**
+`write-wiki.md` の呼び出しはスキップされ、そのまま `place-wiki.md` へ渡される。
+
+#### 出力フォーマット
+
+```
+=== ANALYZE_YAML ===
+file: （ファイル名）
+file_type: text | image | binary
+needs_convert: true | false
+destination: （KnowledgeBase相対パス）
+binary_destination: （バイナリの場合のみ）
+front_matter:
+  wiki_type: （wiki_type）
+  title: （推奨タイトル）
+  scope: （scope）
+  domain: （domain）
+  status: current
+  source: agent
+  source_url: ""
+  tags: []
+classification_confidence: high | medium | low
+classification_method: hints | llm_score | embedding | user
+
+=== WIKI_CONTENT ===
+（write-wiki.md STEP 3 の執筆指示に従い、detail_level に応じた wiki 本文を Markdown で出力）
+（Front-matter は含めない。write-wiki.md STEP 2 が組み立てる）
+```
+
+#### 執筆ルール（統合モード）
+
+- `detail_level` は `pipeline_input.wiki_detail_level` の値（デフォルト: `"summary"`）に従う
+- `"summary"` モード: `write-wiki.md` の `detail_level: "summary"` プロンプトと同じルールで執筆
+  - セクション: `## 概要` / `## 主要ポイント` / `## 関連情報` の3セクション
+  - 分量: 150〜300文字
+- `"full"` モード: `write-wiki.md` の `detail_level: "full"` プロンプトと同じルールで執筆
+  - wiki_type に対応するテンプレートを使用・分量 300〜800文字
+- 元資料にない内容を推測して書かない
+- 文体は「である調」で統一する
+
+> **注意**: このモードは `batch_auto_classify=True` のバッチ処理専用。
+> 単独処理・詳細確認が必要なケースには通常モード（batch_write_wiki=False）を使うこと。
 
 ---
 

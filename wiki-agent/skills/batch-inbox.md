@@ -708,10 +708,17 @@ def run_batch(
             "wiki_detail_level":      wiki_detail_level,   # ← summary / full
             "batch_auto_classify":    batch_auto_classify, # ← 低信頼度自動進行
             "cached_text":            cached_texts.get(abs_path),  # ① キャッシュヒット時は変換スキップ
+            "batch_write_wiki":       True,          # ① analyze + write-wiki を1回のLLM呼び出しに統合
         }
+        # ── パイプライン実行順序（batch_write_wiki=True 時）──
+        # 1. convert-binary.md  → テキスト抽出（cached_text があればスキップ）
+        # 2. analyze.md         → 分類判定 ＋ wiki本文を同時生成（STEP 6 統合モード）
+        #    ↳ write-wiki.md の呼び出しはスキップ（analyze.md が wiki_content を出力済み）
+        # 3. place-wiki.md      → analyze 統合出力の wiki_content を受け取って配置
+        #
         # pipeline_result に期待するフィールド:
         #   status / wiki_path / processed_record / auto_classified / confidence_score / destination
-        #   extracted_text: convert-binary の出力テキスト（キャッシュ用・3000文字まで）← ①で追加
+        #   extracted_text: convert-binary の出力テキスト（キャッシュ用・3000文字まで）← ①
 
         pipeline_result = run_inbox_pipeline(pipeline_input)
         # ↑ convert-binary → analyze → write-wiki → place-wiki（batch_mode）の順に実行
