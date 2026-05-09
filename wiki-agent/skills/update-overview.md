@@ -28,6 +28,81 @@ target_dir: "kyorindo/cx/strategy/"   # KnowledgeBase/ 配下の相対パス
 
 # 全フォルダ一括更新（maintenance-agent から呼び出し時）
 target_dir: "__ALL__"
+
+# 差分追記モード（batch-inbox.md から呼び出し時・クレジット削減）
+mode: "append"          # "append"（差分追記）/ "rebuild"（全体再生成、デフォルト）
+new_files: []           # 今回追加されたファイル名のリスト（append モード専用）
+```
+
+> **モード選択の目安**:
+> - `mode: "append"` — バッチ処理時。追加ファイルを一覧末尾に追記するだけで完結。フォルダ全体を再スキャンしない。LLM呼び出し不要（文字列追記のみ）。
+> - `mode: "rebuild"` — 定期メンテナンス・手動実行時。全ファイルを再スキャンしてLLMが一覧を再生成する。
+
+---
+
+## STEP 0: モード分岐（append / rebuild）
+
+```python
+mode      = input_yaml.get("mode", "rebuild")
+new_files = input_yaml.get("new_files", [])
+
+if mode == "append" and new_files:
+    # ── append モード: LLM不要・ファイル読み書きのみ ──
+    # 各 overview_path に対して、new_files を一覧末尾に追記して終了
+    for overview_path in get_target_dirs(target_dir):
+        _append_to_overview(overview_path, new_files)
+    return {"status": "success", "mode": "append", "appended": len(new_files)}
+
+# ── rebuild モード（以下の STEP 1〜5 を実行）──
+```
+
+### `_append_to_overview()` の実装（LLM不要）
+
+```python
+from datetime import date
+
+def _append_to_overview(overview_path: str, new_files: list[dict]) -> None:
+    """
+    _overview.md の「配下ファイル一覧」セクション末尾に
+    新規ファイルのエントリを追記する（フォルダ全体の再スキャン不要）。
+
+    new_files の各要素: {"filename": str, "title": str, "status": str, "updated": str}
+    """
+    try:
+        with open(overview_path, "r", encoding="utf-8") as f:
+            content = f.read()
+    except Exception:
+        return
+
+    today = date.today().strftime("%Y-%m-%d")
+    new_lines = []
+    for nf in new_files:
+        title   = nf.get("title", nf.get("filename", ""))
+        status  = nf.get("status", "current")
+        updated = nf.get("updated", today)
+        fname   = nf.get("filename", "")
+        # テーブル形式の場合は行追加、箇条書きの場合は bullet 追加
+        new_lines.append(f"| {fname} | {title} | {status} | {updated} |")
+
+    addition = "\n".join(new_lines)
+
+    # 「配下ファイル一覧」セクションの末尾（次の ## の直前、またはファイル末尾）に追記
+    import re
+    pattern = r'(## 配下ファイル一覧\n.*?)(\n## |\Z)'
+    if re.search(pattern, content, re.DOTALL):
+        content = re.sub(
+            pattern,
+            lambda m: m.group(1).rstrip() + "\n" + addition + "\n" + m.group(2),
+            content,
+            flags=re.DOTALL,
+        )
+    else:
+        content = content.rstrip() + f"\n\n## 配下ファイル一覧\n\n{addition}\n"
+
+    # updated 日付を今日に更新
+    content = re.sub(r'(updated:\s*)[\d\-]+', f'\\g<1>{today}', content)
+
+    write_with_retry(overview_path, content)
 ```
 
 ---

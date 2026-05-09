@@ -338,6 +338,8 @@ top5 = [(paths[i], float(similarities[i])) for i in top5_idx]
 
 ## STEP 5: 分類不明の場合
 
+### 通常モード（batch_auto_classify=False）
+
 分類先が確定できない場合は **必ずユーザーに同期質問する**。
 推測で移動しない。
 
@@ -350,6 +352,28 @@ top5 = [(paths[i], float(similarities[i])) for i in top5_idx]
 2. tsuruha-hd/it-dx/
 3. retail/benchmark/
 4. その他（パスを指定してください）
+```
+
+### バッチ自動進行モード（batch_auto_classify=True）
+
+`batch_auto_classify=True` の場合、信頼度 < 6 でも **ユーザー確認なしで自動進行** する。
+
+```python
+if batch_auto_classify and confidence_score < 6:
+    # 最高スコアの候補を採用して処理続行
+    # 出力YAMLに auto_classified=True を付加してバッチ側でリスト管理する
+    result["auto_classified"] = True
+    result["confidence_score"] = confidence_score
+    # → STEP 6 へ進む（ユーザー確認なし）
+```
+
+バッチ処理完了後、STEP 7 完了レポートに自動進行ファイルの一覧を表示する：
+
+```
+⚠️ 低信頼度で自動分類したファイル（要レビュー）: 2件
+  - データ受け渡しファイル定義.xlsx → kyorindo/it-systems/architecture/ [信頼度: 5]
+  - 体制図220826.pptx → kyorindo/organization/ [信頼度: 4]
+  → 分類が誤っている場合は手動で移動してください
 ```
 
 ---

@@ -468,6 +468,62 @@ def extract_title(html_or_text: str) -> str:
 
 ---
 
+## 実行方法（クレジット削減）
+
+**必ず `Bash` ツールで Python を直接実行すること。**
+LLM がコードを「解釈しながら」変換すると、思考トークンが大量消費される。
+
+```python
+# ✅ 正しい実行方法（Bash ツールを使う）
+# Bash: python -c "exec(open('...').read())" または下記スクリプトをインライン実行
+
+# ❌ 避けるべき方法（LLM による逐次解釈）
+# 「このファイルの各スライドを読んで...」などの自然言語処理
+```
+
+### 各フォーマットの Bash 実行コマンド例
+
+```bash
+# PPTX
+python -c "
+import sys; sys.stdout.reconfigure(encoding='utf-8')
+from pptx import Presentation
+prs = Presentation(r'{file_path}')
+lines = []
+for i, slide in enumerate(prs.slides):
+    texts = [s.text.strip() for s in slide.shapes if hasattr(s,'text') and s.text.strip()]
+    if texts: lines.append(f'## スライド {i+1}\n\n' + '\n'.join(texts))
+print('\n\n---\n\n'.join(lines)[:8000])
+"
+
+# XLSX
+python -c "
+import sys; sys.stdout.reconfigure(encoding='utf-8')
+import openpyxl
+wb = openpyxl.load_workbook(r'{file_path}', read_only=True, data_only=True)
+for name in wb.sheetnames:
+    ws = wb[name]; print(f'## シート: {name}')
+    for i, row in enumerate(ws.iter_rows(values_only=True)):
+        if i >= 200: break
+        cells = [str(c) if c is not None else '' for c in row]
+        line = ' | '.join(cells).strip(' |')
+        if line: print(line)
+    print()
+"
+
+# PDF
+python -c "
+import sys; sys.stdout.reconfigure(encoding='utf-8')
+from pdfminer.high_level import extract_text
+print(extract_text(r'{file_path}')[:8000])
+"
+```
+
+> テキスト抽出は必ず Bash で完結させ、出力結果だけを analyze.md に渡す。
+> 抽出完了後は `converted_text` 変数に格納し、以降は Python 実行不要。
+
+---
+
 ## STEP 3: メイン呼び出し関数
 
 ```python

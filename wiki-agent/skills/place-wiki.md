@@ -195,6 +195,23 @@ if overview_created:
 wiki 保存が完了したこのタイミングで処理状態を記録する。
 `index_registered` / `binary_moved` は後続ステップ完了後に更新される。
 
+> **batch_mode=True の場合（クレジット削減）**:
+> ファイルごとに YAML 読み書きすると O(n²) の I/O が発生する。
+> `batch_mode=True` 時はレコードをメモリ上の `batch_records_buffer` に積むだけにし、
+> `flush_batch_post_processing()` がバッチ末尾で **1回だけ** ファイルに書き込む。
+>
+> ```python
+> # batch_mode=True の場合: バッファに積む
+> if batch_mode:
+>     batch_records_buffer.append(new_record)   # flush で一括書き込み
+>     return
+> # batch_mode=False の場合: 即時書き込み（従来通り）
+> upsert_processed_record(source_path, file_hash, wiki_path, today)
+> ```
+>
+> `batch_records_buffer` は `run_batch()` が管理し、
+> `flush_batch_post_processing()` の末尾で `upsert_all_processed_records(buffer)` を呼ぶ。
+
 ```python
 import hashlib
 import yaml

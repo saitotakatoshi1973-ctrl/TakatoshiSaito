@@ -33,6 +33,7 @@
 | `wiki_filter` | — | `false` | LLM事前スクリーニングで低価値ファイルを除外するか |
 | `wiki_score_threshold` | — | `6` | wiki_filter 有効時の採用スコア下限（0〜10） |
 | `wiki_detail_level` | — | `"summary"` | wikiの詳細度。`"summary"`（箇条書き中心・短め）/ `"full"`（全テンプレート・詳細） |
+| `batch_auto_classify` | — | `true` | `true` = 信頼度 < 6 でも自動進行しレビューリストに記録。`false` = 従来通りユーザー確認で停止 |
 
 ---
 
@@ -655,7 +656,8 @@ def show_preview(
 def run_batch(
     to_process: list[str],
     filtered: dict,
-    wiki_detail_level: str = "summary",
+    wiki_detail_level:   str  = "summary",
+    batch_auto_classify: bool = True,
 ) -> dict:
     """
     to_process の各ファイルを wiki 化する。1ファイルずつ直列で処理する。
@@ -663,14 +665,19 @@ def run_batch(
     クレジット削減のため batch_mode=True を place-wiki に渡し、
     _overview.md 更新・change_log 追記・index-builder 呼び出しを
     処理ループ内では行わず、後で flush_batch_post_processing() にまとめる。
+
+    batch_auto_classify=True の場合、信頼度 < 6 のファイルも自動進行し
+    auto_classified_list に記録する（バッチ後にまとめてレビュー可能）。
     """
+    auto_classified = []   # 低信頼度で自動進行したファイルのリスト
     results      = []
     skipped      = []
     errors       = []
     # バッチ末尾で一括処理する後処理キュー
-    deferred_overviews  = set()    # 更新が必要なフォルダパス（重複排除）
-    deferred_changelog  = []       # change_log エントリ（文字列リスト）
-    deferred_wiki_paths = []       # index-builder に渡す wiki パス
+    deferred_overviews   = set()   # 更新が必要なフォルダパス（重複排除）
+    deferred_changelog   = []      # change_log エントリ（文字列リスト）
+    deferred_wiki_paths  = []      # index-builder に渡す wiki パス
+    deferred_ps_records  = []      # processed-sources.yaml レコード（一括書き込み用）
 
     for abs_path in to_process:
         rel_path  = to_personal_relative(abs_path)
@@ -693,8 +700,9 @@ def run_batch(
             "original_personal_path": rel_path,
             "file_hash":              file_hash,
             "skip_route_binary":      True,
-            "batch_mode":             True,       # ← 後処理を遅延させる
-            "wiki_detail_level":      wiki_detail_level,  # ← summary / full
+            "batch_mode":             True,          # ← 後処理を遅延させる
+            "wiki_detail_level":      wiki_detail_level,   # ← summary / full
+            "batch_auto_classify":    batch_auto_classify, # ← 低信頼度自動進行
         }
 
         pipeline_result = run_inbox_pipeline(pipeline_input)
@@ -706,6 +714,14 @@ def run_batch(
                 os.remove(inbox_copy)
         except Exception:
             pass
+
+        # 低信頼度で自動進行した場合はリストに記録
+        if pipeline_result.get("auto_classified"):
+            auto_classified.append({
+                "file":        rel_path,
+                "destination": pipeline_result.get("destination", ""),
+                "confidence":  pipeline_result.get("confidence_score", 0),
+            })
 
         # 結果を記録
         if pipeline_result.get("status") == "skip":
@@ -735,8 +751,12 @@ def run_batch(
             deferred_wiki_paths.append(
                 os.path.join(KB_ROOT, wiki_path)
             )
+            # processed-sources.yaml レコードもバッファに積む（一括書き込み用）
+            if "processed_record" in pipeline_result:
+                deferred_ps_records.append(pipeline_result["processed_record"])
 
     return {
+        "auto_classified_list": auto_classified,  # バッチ完了後レビュー用
         "status":               "success" if not errors else "partial",
         "processed":            len(results),
         "skipped":              len(skipped),
@@ -748,6 +768,7 @@ def run_batch(
         "deferred_overviews":   list(deferred_overviews),
         "deferred_changelog":   deferred_changelog,
         "deferred_wiki_paths":  deferred_wiki_paths,
+        "deferred_ps_records":  deferred_ps_records,
     }
 
 
@@ -755,6 +776,7 @@ def flush_batch_post_processing(
     deferred_overviews:  list[str],
     deferred_changelog:  list[str],
     deferred_wiki_paths: list[str],
+    deferred_ps_records: list[dict] | None = None,
 ) -> dict:
     """
     run_batch() が収集した後処理を一括で実行する。
@@ -763,16 +785,32 @@ def flush_batch_post_processing(
     ② change_log への一括追記: 全エントリを1回のファイル書き込みで追記
     ③ index-builder の一括実行: 全 wiki パスを渡して1回だけ呼ぶ
 
-    これにより、ファイルごとに3回発生していた後処理がまとめて3回になる。
+    これにより、ファイルごとに3回発生していた後処理がまとめて3〜4回になる。
+    （processed-sources.yaml 含めると4回）
     """
     flush_errors = []
 
-    # ① _overview.md 一括更新（影響フォルダ数分だけ実行）
+    # ① _overview.md 一括更新（影響フォルダ数分だけ、append モードで LLM不要）
     for dest_dir in deferred_overviews:
         overview_path = os.path.join(dest_dir, "_overview.md")
         if os.path.exists(overview_path):
             try:
-                update_overview_run(overview_path)   # update-overview.md スキルを呼ぶ
+                # そのフォルダに追加された wiki ファイルだけを渡す（差分追記）
+                new_files_for_dir = [
+                    {
+                        "filename": os.path.basename(p),
+                        "title":    os.path.basename(p).replace(".md", ""),
+                        "status":   "current",
+                        "updated":  date.today().strftime("%Y-%m-%d"),
+                    }
+                    for p in deferred_wiki_paths
+                    if os.path.dirname(p) == dest_dir
+                ]
+                update_overview_run(
+                    target_dir = os.path.relpath(dest_dir, KB_ROOT).replace("\\", "/"),
+                    mode       = "append",        # LLM不要の差分追記モード
+                    new_files  = new_files_for_dir,
+                )
             except Exception as e:
                 flush_errors.append({"step": "overview", "dir": dest_dir, "error": str(e)})
 
@@ -800,10 +838,51 @@ def flush_batch_post_processing(
         except Exception as e:
             flush_errors.append({"step": "index_builder", "error": str(e)})
 
+    # ④ processed-sources.yaml 一括書き込み（O(n²) → O(1) に削減）
+    if deferred_ps_records:
+        try:
+            upsert_all_processed_records(deferred_ps_records)
+        except Exception as e:
+            flush_errors.append({"step": "processed_sources", "error": str(e)})
+
     return {
         "status": "success" if not flush_errors else "partial",
         "errors": flush_errors,
     }
+
+
+def upsert_all_processed_records(records: list[dict]) -> None:
+    """
+    processed-sources.yaml を1回だけ読み込み、バッファの全レコードを
+    upsert して1回だけ書き込む。バッチ処理時の O(n²) I/O を O(1) に削減。
+    """
+    existing = []
+    if os.path.exists(PROCESSED_PATH):
+        try:
+            with open(PROCESSED_PATH, "r", encoding="utf-8") as f:
+                existing = yaml.safe_load(f) or []
+        except Exception:
+            existing = []
+
+    # source_path をキーにして upsert
+    existing_map = {r["source_path"]: i for i, r in enumerate(existing) if r.get("source_path")}
+    for rec in records:
+        sp = rec.get("source_path")
+        if sp and sp in existing_map:
+            existing[existing_map[sp]] = rec   # 上書き
+        else:
+            existing.append(rec)               # 追加
+
+    for attempt in range(3):
+        try:
+            with open(PROCESSED_PATH, "w", encoding="utf-8") as f:
+                yaml.dump(existing, f, allow_unicode=True, default_flow_style=False)
+            return
+        except PermissionError:
+            if attempt < 2:
+                time.sleep(5)
+            else:
+                raise RuntimeError("processed-sources.yaml への一括書き込みに失敗しました")
 
 
 def _resolve_collision(dest_path: str) -> str:
@@ -847,9 +926,15 @@ def _resolve_collision(dest_path: str) -> str:
 【エラー（手動確認）】
   ❌ 旧_CX方針.pptx → convert-binary 失敗（パスワード保護の可能性）
 
+【低信頼度で自動分類（要レビュー）】
+  ⚠️ 体制図220826.pptx → kyorindo/organization/ [信頼度: 4]
+  → 誤っている場合は手動で移動してください
+
 次回「wikiバッチ処理して」で同じフォルダを指定すると、未処理・更新されたファイルのみ対象になります。
 処理状態: KnowledgeBase/_system/processed-sources.yaml
 ```
+
+> `auto_classified_list` が空の場合、「低信頼度で自動分類」セクションは表示しない。
 
 ---
 
@@ -860,10 +945,11 @@ def run(
     target_dir: str,
     recursive: bool      = False,
     file_types: set[str] = DEFAULT_FILE_TYPES,
-    max_files: int        = 10,
+    max_files: int        = 20,              # ← 10→20（⑨の変更）
     wiki_filter: bool     = False,
     wiki_score_threshold: int = 6,
-    wiki_detail_level: str    = "summary",   # ← 追加
+    wiki_detail_level: str    = "summary",   # ← ⑤で追加
+    batch_auto_classify: bool = True,        # ← ⑦で追加
 ) -> dict:
     # 絶対パスに正規化
     if not os.path.isabs(target_dir):
@@ -918,7 +1004,12 @@ def run(
         return {"status": "cancelled", "message": "処理をキャンセルしました"}
 
     # STEP 4〜6: 処理実行（batch_mode=True で後処理を遅延）
-    result = run_batch(to_process, filtered, wiki_detail_level=wiki_detail_level)
+    result = run_batch(
+        to_process,
+        filtered,
+        wiki_detail_level    = wiki_detail_level,
+        batch_auto_classify  = batch_auto_classify,
+    )
     result["cloud_files"] = len(cloud_files)
     result["cloud_download_targets"] = len(cloud_result["download_targets"])
     result["cloud_downloaded"] = len(hydrate_result["downloaded"])
@@ -930,6 +1021,7 @@ def run(
         deferred_overviews  = result.pop("deferred_overviews",  []),
         deferred_changelog  = result.pop("deferred_changelog",  []),
         deferred_wiki_paths = result.pop("deferred_wiki_paths", []),
+        deferred_ps_records = result.pop("deferred_ps_records", []),
     )
     if flush_result["errors"]:
         result["error_list"].extend(flush_result["errors"])
