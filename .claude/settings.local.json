@@ -44,7 +44,9 @@
       "Bash(git -C \"C:\\\\Users\\\\takatoshi-saito\\\\OneDrive\\\\00personal\\\\ClaudeCodeFolder\" log --oneline -5)",
       "Bash(git -C \"C:\\\\Users\\\\takatoshi-saito\\\\OneDrive\\\\00personal\\\\KnowledgeBase\" status)",
       "Bash(git -C \"C:\\\\Users\\\\takatoshi-saito\\\\OneDrive\\\\00personal\\\\ClaudeCodeFolder\" add .claude/settings.local.json)",
-      "Bash(git -C 'C:\\\\Users\\\\takatoshi-saito\\\\OneDrive\\\\00personal\\\\ClaudeCodeFolder' commit -m ' *)"
+      "Bash(git -C 'C:\\\\Users\\\\takatoshi-saito\\\\OneDrive\\\\00personal\\\\ClaudeCodeFolder' commit -m ' *)",
+      "Bash(git -C \"C:\\\\Users\\\\takatoshi-saito\\\\OneDrive\\\\00personal\\\\ClaudeCodeFolder\" diff --stat)",
+      "Bash(git -C \"C:\\\\Users\\\\takatoshi-saito\\\\OneDrive\\\\00personal\\\\ClaudeCodeFolder\" push origin main)"
     ]
   }
 }
