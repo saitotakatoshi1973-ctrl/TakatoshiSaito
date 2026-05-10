@@ -1,10 +1,16 @@
-# write-wiki.md — wiki記事執筆スキル
+# write-wiki.md — wiki記事執筆スキル（Claude モード / フォールバック）
 
 ## 概要
 
+> ⚠️ **このスキルは フォールバック専用です。**
+> 通常の wiki 化パイプラインでは `gemini_wiki_generator.py` が分類・本文生成を担います。
+> 本スキルが呼ばれるのは以下のケースのみです：
+> - Gemini API が失敗した場合（自動フォールバック）
+> - 「Claudeモードで」と明示指定された場合（`use_gemini=false`）
+> - 既存資料の後追いwiki化を手動で行う場合
+
 `analyze.md` の分類結果YAMLと変換テキストを受け取り、
-KnowledgeBase wiki 用の Markdown ファイルを生成・保存します。
-`_inbox/` 経由だけでなく、既存資料の後追いwiki化でも再利用できます。
+Claude が KnowledgeBase wiki 用の Markdown ファイルを生成・保存します。
 
 ---
 
@@ -493,8 +499,15 @@ converted_text: "（convert-binary.md で変換したテキスト）"
 ## 呼び出し元・呼び出し先
 
 ```
-analyze.md
-    └─→ write-wiki.md（本スキル）
-            ├─→ update-overview.md（_overview.md が存在する場合）
-            └─→ place-wiki.md（ファイル配置・元ファイル移動）
+【フォールバック経路での位置づけ】
+inbox-agent.md（Gemini失敗時）
+    └─→ analyze.md
+            └─→ write-wiki.md（本スキル）
+                    ├─→ update-overview.md（_overview.md が存在する場合）
+                    └─→ place-wiki.md（ファイル配置・元ファイル移動）
+
+【正本経路（通常）】
+inbox-agent.md / batch-inbox.md
+    └─→ gemini_wiki_generator.py --analyze-only → --generate
+            └─→ place-wiki.md
 ```

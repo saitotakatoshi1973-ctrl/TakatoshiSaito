@@ -6,6 +6,9 @@
 `_inbox/` にあるファイルを1件ずつ順番にwiki化します。
 各スキルを順番に呼び出し、完了後にまとめて結果を報告します。
 
+**正本経路**: `gemini_wiki_generator.py` を直接呼び出し（分類・本文生成ともGemini）。
+**フォールバック経路**: Gemini失敗時のみ `analyze.md → write-wiki.md`（Claudeモード）。
+
 ---
 
 ## 起動方法
@@ -16,6 +19,11 @@ Claude Code のチャットで以下のように呼びかけてください：
 inbox処理して
 _inboxのファイルを処理して
 新しいファイルをwiki化して
+```
+
+Claudeモードで処理したい場合（Geminiを使わない）：
+```
+inbox処理して。Claudeモードで。
 ```
 
 ---
@@ -49,35 +57,59 @@ def collect_inbox_files() -> list[str]:
 
 ## 処理フロー（1ファイルあたり）
 
+### 正本経路（use_gemini=True、デフォルト）
+
 ```
 _inbox/ のファイル
     │
     ▼
-STEP 1: convert-binary.md
-    │  テキスト抽出・URL取得
-    │  ※ url_list の場合 → URL数だけループ
+STEP 1: テキスト抽出
+    │  convert-binary.md でテキスト化（キャッシュがあればスキップ）
+    │  Gemini がファイルを直接読める形式（pptx/xlsx/pdf）は source_file_abs_path を渡すだけでもよい
     │
     ▼
-STEP 2: analyze.md
-    │  分類先・wiki_type・信頼度スコアを判定
+STEP 2: gemini_wiki_generator.py --analyze-only
+    │  SCHEMA.md と classification-hints.md を読み
+    │  destination / wiki_type / title / confidence_score を JSON で返す
     │
-    ├─ 信頼度 < 6 → STEP 3: ユーザー確認・修正
+    ├─ needs_review=true → STEP 3: ユーザー確認・修正
     │
     ▼
-STEP 4: write-wiki.md
-    │  wiki Markdown を生成・保存
+STEP 4: gemini_wiki_generator.py --generate
+    │  分類結果JSON を受け取り、wiki本文 Markdown のみを stdout に出力
     │
     ▼
 STEP 5: place-wiki.md
-    │  _overview.md 更新 / change_log 記録 / index 追加 / route-binary
+    │  Front-matter 生成・wikiファイル保存・_overview.md 更新
+    │  change_log 記録 / index 追加 / route-binary
     │
     ▼
 STEP 6: 元ファイルを _inbox/ から削除
 ```
 
+### フォールバック経路（Gemini失敗時 または use_gemini=False 時）
+
+```
+_inbox/ のファイル
+    │
+    ▼
+STEP 1: convert-binary.md（テキスト抽出）
+    │
+    ▼
+STEP 2F: analyze.md（Claude分類）
+    │
+    ├─ 信頼度 < 6 → STEP 3: ユーザー確認・修正
+    │
+    ▼
+STEP 4F: write-wiki.md（Claude本文生成）
+    │
+    ▼
+STEP 5: place-wiki.md → STEP 6: 元ファイル削除
+```
+
 ---
 
-## STEP 1: convert-binary.md を呼び出す
+## STEP 1: テキスト抽出
 
 ```yaml
 # convert-binary.md への入力
@@ -88,33 +120,72 @@ file_path: "{abs_path}"
 
 | convert の結果 | 後続処理 |
 |--------------|---------|
-| 通常テキスト（str） | → analyze.md に渡す（1件処理） |
+| 通常テキスト（str） | → STEP 2 に渡す（1件処理） |
 | url_list（list[dict]） | → URLごとにループ（STEP 2〜5 を繰り返す） |
 | `status: error` | → スキップしてエラーログに記録 |
 
 ---
 
-## STEP 2: analyze.md を呼び出す
+## STEP 2: gemini_wiki_generator.py --analyze-only（正本経路）
 
-```yaml
-# analyze.md への入力
-content: "{convert で得たテキスト}"
-file_name: "{元ファイル名}"
+```python
+import subprocess, sys, json
+
+GEMINI_SCRIPT = r"C:\Users\takatoshi-saito\OneDrive\00personal\ClaudeCodeFolder\wiki-agent\scripts\gemini_wiki_generator.py"
+SCHEMA_PATH   = r"C:\Users\takatoshi-saito\OneDrive\00personal\KnowledgeBase\_system\SCHEMA.md"
+HINTS_PATH    = r"C:\Users\takatoshi-saito\OneDrive\00personal\KnowledgeBase\_system\classification-hints.md"
+
+def gemini_analyze(file_path: str, converted_text: str = "") -> dict:
+    """
+    gemini_wiki_generator.py --analyze-only を呼び出し分類結果JSONを返す。
+    戻り値: {
+        "destination": "kyorindo/cx/strategy/",
+        "wiki_type":   "strategy",
+        "title":       "CX推進ロードマップ v4",
+        "confidence_score": 8,
+        "needs_review": False,
+        "tags": [...],
+        "scope": "kyorindo",
+        "domain": "cx",
+    }
+    または {"status": "error", "reason": "..."}
+    """
+    cmd = [
+        sys.executable, GEMINI_SCRIPT, file_path,
+        "--analyze-only", "--emit-usage",
+        "--schema-path",  SCHEMA_PATH,
+        "--hints-path",   HINTS_PATH,
+    ]
+    if converted_text:
+        cmd += ["--converted-text", converted_text[:30000]]
+
+    try:
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, encoding="utf-8", timeout=120
+        )
+        if result.returncode != 0:
+            return {"status": "error", "reason": result.stderr.strip()}
+        return json.loads(result.stdout.strip())
+    except Exception as e:
+        return {"status": "error", "reason": str(e)}
 ```
 
 ### 戻り値（analyze の主要フィールド）
 
 ```yaml
-wiki_type: "strategy"
-destination: "kyorindo/cx/strategy/"
-title: "CX推進ロードマップ v4"
-confidence_score: 8          # 0〜10
-classification_method: "llm_scoring"
+destination:       "kyorindo/cx/strategy/"
+wiki_type:         "strategy"
+title:             "CX推進ロードマップ v4"
+confidence_score:  8          # 0〜10
+needs_review:      false      # true の場合 STEP 3 へ
+tags:              ["CX", "ロードマップ", "2026"]
+scope:             "kyorindo"
+domain:            "cx"
 ```
 
 ---
 
-## STEP 3: 信頼度が低い場合はユーザーに確認する（confidence_score < 6）
+## STEP 3: needs_review=true の場合はユーザーに確認する
 
 ### ユーザーへの提示メッセージ
 
@@ -144,41 +215,80 @@ classification_method: "llm_scoring"
 
 ---
 
-## STEP 4: write-wiki.md を呼び出す
+## STEP 4: gemini_wiki_generator.py --generate（正本経路）
+
+```python
+def gemini_generate(file_path: str, analysis: dict, converted_text: str = "") -> dict:
+    """
+    gemini_wiki_generator.py --generate を呼び出し wiki 本文 Markdown を返す。
+    戻り値: {"status": "success", "body": str}
+         または {"status": "error", "reason": str}
+    """
+    import tempfile, os
+
+    # 分類結果を一時ファイル経由で渡す
+    with tempfile.NamedTemporaryFile(
+        mode="w", suffix=".json", delete=False, encoding="utf-8"
+    ) as f:
+        json.dump(analysis, f, ensure_ascii=False)
+        analysis_json_path = f.name
+
+    cmd = [
+        sys.executable, GEMINI_SCRIPT, file_path,
+        "--generate", "--emit-usage",
+        "--analysis-json", analysis_json_path,
+    ]
+    if converted_text:
+        cmd += ["--converted-text", converted_text[:30000]]
+
+    try:
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, encoding="utf-8", timeout=120
+        )
+        os.unlink(analysis_json_path)
+        if result.returncode != 0:
+            return {"status": "error", "reason": result.stderr.strip()}
+        body = result.stdout.strip()
+        if not body:
+            return {"status": "error", "reason": "Gemini から空の本文が返されました"}
+        return {"status": "success", "body": body}
+    except Exception as e:
+        return {"status": "error", "reason": str(e)}
+```
+
+---
+
+## STEP 2F / 4F: フォールバック経路（Gemini失敗時 / Claudeモード時）
+
+Gemini（STEP 2 または STEP 4）が失敗した場合、または `use_gemini=False` の場合に実行。
+
+```yaml
+# analyze.md への入力
+content: "{STEP 1 で得たテキスト}"
+file_name: "{元ファイル名}"
+```
 
 ```yaml
 # write-wiki.md への入力
-wiki_type:   "{wiki_type}"
-destination: "{destination}"
-title:       "{title}"
-content:     "{convert で得たテキスト}"
-source_file: "{元ファイル名}"
-# ── Gemini モード用（呼び出し元から use_gemini=true が指定された場合のみ）──
-use_gemini:           "{use_gemini}"          # true / false
-source_file_abs_path: "{元ファイルの絶対パス}"  # Gemini が直接読み取るために使用
+wiki_type:            "{wiki_type}"
+destination:          "{destination}"
+title:                "{title}"
+content:              "{変換テキスト}"
+source_file:          "{元ファイル名}"
+use_gemini:           false          # フォールバック時は Claude で生成
+source_file_abs_path: "{絶対パス}"
 ```
-
-### Geminiモードについて
-
-**Geminiモードはデフォルトで有効**（`use_gemini: true`）。
-write-wiki の本文生成を Gemini 2.5 Flash API に委譲することで低コスト化・Excel/PPTX実内容読取を実現する。
-
-Claudeモードに切り替えたい場合は明示的に指定する：
-```
-inbox処理して。Claudeモードで。（use_gemini=false）
-```
-
-通常は `use_gemini: true` と `source_file_abs_path`（元ファイルの絶対パス）を
-pipeline_input に含めて write-wiki.md を呼び出すこと。
 
 ---
 
 ## STEP 5: place-wiki.md を呼び出す
 
 ```yaml
-# place-wiki.md への入力
-wiki_path:   "{write-wiki.md が生成したファイルの絶対パス}"
-source_file: "{元ファイルの絶対パス}"
+# place-wiki.md への入力（正本経路）
+wiki_path:    "{生成した wiki ファイルの絶対パス}"
+source_file:  "{元ファイルの絶対パス}"
+wiki_content: "{front-matter + body の完成 Markdown}"
+analysis:     "{STEP 2 の分類結果 dict}"
 ```
 
 place-wiki.md が以下を自動実行します：
@@ -229,13 +339,13 @@ def delete_inbox_file(file_path: str, retries: int = 3, wait: int = 5) -> bool:
 ## メイン実行フロー
 
 ```python
-def run() -> dict:
+def run(use_gemini: bool = True) -> dict:
     files = collect_inbox_files()
 
     if not files:
         return {
-            "status": "success",
-            "message": "_inbox/ に処理対象ファイルがありません",
+            "status":    "success",
+            "message":   "_inbox/ に処理対象ファイルがありません",
             "processed": 0,
         }
 
@@ -246,14 +356,13 @@ def run() -> dict:
     for file_path in files:
         fname = os.path.basename(file_path)
 
-        # STEP 1: convert-binary.md
+        # STEP 1: テキスト抽出（convert-binary.md）
         convert_result = convert_binary_run(file_path)
 
         if convert_result.get("status") == "error":
             errors.append({"file": fname, "step": "convert", "error": convert_result.get("reason")})
             continue
 
-        # url_list の場合は複数ループ、通常テキストは1件として処理
         items = (
             convert_result["items"]
             if convert_result.get("type") == "url_list"
@@ -264,64 +373,118 @@ def run() -> dict:
 
         for item in items:
             content    = item["content"]
-            item_label = item.get("url") or fname   # ログ表示用
+            item_label = item.get("url") or fname
 
-            # STEP 2: analyze.md
-            analyze_result = analyze_run(content=content, file_name=fname)
+            wiki_body      = None
+            analysis       = None
+            generation_method = "gemini"
 
-            if analyze_result.get("status") == "error":
-                errors.append({"file": item_label, "step": "analyze", "error": analyze_result.get("reason")})
-                file_has_error = True
-                continue
+            # ── 正本経路: Gemini ──────────────────────────
+            if use_gemini:
+                # STEP 2: Gemini 分類
+                analysis = gemini_analyze(file_path, converted_text=content)
 
-            confidence = analyze_result.get("confidence_score", 10)
+                if analysis.get("status") == "error":
+                    print(f"⚠️  Gemini 分類失敗（{analysis['reason']}）→ Claude フォールバック")
+                    use_gemini_for_item = False
+                else:
+                    use_gemini_for_item = True
 
-            # STEP 3: 信頼度 < 6 → ユーザー確認
-            if confidence < 6:
-                user_choice = ask_user_classify_confirm(fname, analyze_result)
+                    # STEP 3: needs_review=true の場合ユーザー確認
+                    if analysis.get("needs_review"):
+                        user_choice = ask_user_classify_confirm(fname, analysis)
+                        if user_choice == "skip":
+                            skipped.append({"file": item_label, "reason": "ユーザーがスキップを選択"})
+                            file_has_error = True
+                            continue
+                        if user_choice.get("correction"):
+                            analysis["destination"] = user_choice["correction"]
+                            record_feedback_run(
+                                source                   = "analyze",
+                                file_name                = fname,
+                                agent_judgment           = analysis.get("destination"),
+                                user_correction          = user_choice["correction"],
+                                classification_confidence= analysis.get("confidence_score", 0),
+                                classification_method    = "gemini_analyze",
+                                user_comment             = user_choice.get("comment", ""),
+                            )
 
-                if user_choice == "skip":
-                    skipped.append({"file": item_label, "reason": "ユーザーがスキップを選択"})
+                    # STEP 4: Gemini 本文生成
+                    gen_result = gemini_generate(file_path, analysis, converted_text=content)
+                    if gen_result.get("status") == "error":
+                        print(f"⚠️  Gemini 本文生成失敗（{gen_result['reason']}）→ Claude フォールバック")
+                        use_gemini_for_item = False
+                    else:
+                        wiki_body = gen_result["body"]
+                        generation_method = "gemini"
+
+            else:
+                use_gemini_for_item = False
+
+            # ── フォールバック経路: Claude ────────────────
+            if not use_gemini or not use_gemini_for_item or wiki_body is None:
+                generation_method = "claude"
+
+                # STEP 2F: analyze.md（Claude分類）
+                analyze_result = analyze_run(content=content, file_name=fname)
+
+                if analyze_result.get("status") == "error":
+                    errors.append({"file": item_label, "step": "analyze", "error": analyze_result.get("reason")})
                     file_has_error = True
                     continue
 
-                if user_choice.get("correction"):
-                    # ユーザーが保存先を修正した場合
-                    analyze_result["destination"] = user_choice["correction"]
-                    record_feedback_run(
-                        source            = "analyze",
-                        file_name         = fname,
-                        agent_judgment    = analyze_result.get("destination_original"),
-                        user_correction   = user_choice["correction"],
-                        classification_confidence = confidence,
-                        classification_method     = analyze_result.get("classification_method"),
-                        user_comment      = user_choice.get("comment", ""),
-                    )
+                confidence = analyze_result.get("confidence_score", 10)
+                if confidence < 6:
+                    user_choice = ask_user_classify_confirm(fname, analyze_result)
+                    if user_choice == "skip":
+                        skipped.append({"file": item_label, "reason": "ユーザーがスキップを選択"})
+                        file_has_error = True
+                        continue
+                    if user_choice.get("correction"):
+                        analyze_result["destination"] = user_choice["correction"]
+                        record_feedback_run(
+                            source                   = "analyze",
+                            file_name                = fname,
+                            agent_judgment           = analyze_result.get("destination_original"),
+                            user_correction          = user_choice["correction"],
+                            classification_confidence= confidence,
+                            classification_method    = analyze_result.get("classification_method"),
+                            user_comment             = user_choice.get("comment", ""),
+                        )
 
-            # STEP 4: write-wiki.md
-            write_result = write_wiki_run(
-                wiki_type   = analyze_result["wiki_type"],
-                destination = analyze_result["destination"],
-                title       = analyze_result["title"],
-                content     = content,
-                source_file = fname,
-            )
+                analysis = analyze_result
 
-            if write_result.get("status") == "error":
-                errors.append({"file": item_label, "step": "write_wiki", "error": write_result.get("reason")})
-                file_has_error = True
-                continue
+                # STEP 4F: write-wiki.md（Claude本文生成）
+                write_result = write_wiki_run(
+                    wiki_type            = analysis["wiki_type"],
+                    destination          = analysis["destination"],
+                    title                = analysis["title"],
+                    content              = content,
+                    source_file          = fname,
+                    use_gemini           = False,
+                    source_file_abs_path = file_path,
+                )
+
+                if write_result.get("status") == "error":
+                    errors.append({"file": item_label, "step": "write_wiki", "error": write_result.get("reason")})
+                    file_has_error = True
+                    continue
+
+                wiki_body = write_result.get("body")
 
             # STEP 5: place-wiki.md
             place_result = place_wiki_run(
-                wiki_path   = write_result["wiki_path"],
-                source_file = file_path,
+                wiki_path    = build_wiki_path(analysis),
+                source_file  = file_path,
+                wiki_content = build_wiki_content(analysis, wiki_body),
+                analysis     = analysis,
             )
 
             results.append({
-                "file":      item_label,
-                "wiki_path": write_result["wiki_path"],
-                "destination": analyze_result["destination"],
+                "file":              item_label,
+                "wiki_path":         place_result.get("wiki_path"),
+                "destination":       analysis["destination"],
+                "generation_method": generation_method,
             })
 
         # STEP 6: 元ファイルを削除（エラーなく全 item を処理できた場合）
@@ -331,11 +494,11 @@ def run() -> dict:
                 errors.append({"file": fname, "step": "delete", "error": "ファイル削除失敗（手動削除してください）"})
 
     return {
-        "status":    "success" if not errors else "partial",
-        "processed": len(results),
-        "skipped":   len(skipped),
-        "errors":    len(errors),
-        "results":   results,
+        "status":       "success" if not errors else "partial",
+        "processed":    len(results),
+        "skipped":      len(skipped),
+        "errors":       len(errors),
+        "results":      results,
         "skipped_list": skipped,
         "error_list":   errors,
     }
@@ -355,8 +518,7 @@ def run() -> dict:
 エラー:   {errors}件
 
 【処理済みファイル】
-{results を1行ずつ表示}
-  - {file} → {wiki_path}
+  - {file} → {wiki_path}  ({generation_method})
 
 【スキップ】
 {skipped_list を1行ずつ表示（ある場合のみ）}
@@ -372,24 +534,33 @@ def run() -> dict:
 | 発生箇所 | 対処 |
 |---------|------|
 | convert-binary.md 失敗 | スキップ・エラーログ記録 |
-| analyze.md 失敗 | スキップ・エラーログ記録 |
-| write-wiki.md 失敗 | スキップ・エラーログ記録、元ファイルは _inbox/ に残す |
+| Gemini 分類失敗（STEP 2） | Claude フォールバック（analyze.md）へ |
+| Gemini 本文生成失敗（STEP 4） | Claude フォールバック（write-wiki.md）へ |
+| analyze.md 失敗（フォールバック） | スキップ・エラーログ記録 |
+| write-wiki.md 失敗（フォールバック） | スキップ・エラーログ記録、元ファイルは _inbox/ に残す |
 | place-wiki.md 失敗 | wikiファイルはそのまま残す・エラーログ記録 |
 | 元ファイル削除失敗 | エラーログ記録・ユーザーに手動削除を促す |
 
 ---
 
-## 呼び出し先スキル
+## 呼び出し先スキル・スクリプト
 
 ```
 inbox-agent.md
-    ├─→ convert-binary.md   （テキスト抽出）
-    ├─→ analyze.md          （分類）
-    ├─→ record-feedback.md  （ユーザー修正時のみ）
-    ├─→ write-wiki.md       （wiki生成）
-    └─→ place-wiki.md       （後処理一式）
-            ├─→ update-overview.md
-            ├─→ change_log_YYYY-MM.md
-            ├─→ index-builder.md（add）
-            └─→ route-binary.md
+    ├─→ convert-binary.md              （テキスト抽出）
+    │
+    ├─→ [正本経路]
+    │       ├─→ gemini_wiki_generator.py --analyze-only  （Gemini分類）
+    │       ├─→ gemini_wiki_generator.py --generate      （Gemini本文生成）
+    │       └─→ place-wiki.md                            （後処理一式）
+    │               ├─→ update-overview.md
+    │               ├─→ change_log_YYYY-MM.md
+    │               ├─→ index-builder.md（add）
+    │               └─→ route-binary.md
+    │
+    └─→ [フォールバック経路（Gemini失敗時）]
+            ├─→ analyze.md             （Claude分類）
+            ├─→ record-feedback.md     （ユーザー修正時のみ）
+            ├─→ write-wiki.md          （Claude本文生成）
+            └─→ place-wiki.md          （後処理一式）
 ```
