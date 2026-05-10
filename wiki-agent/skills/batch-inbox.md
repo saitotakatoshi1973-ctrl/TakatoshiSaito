@@ -959,7 +959,7 @@ def flush_batch_post_processing(
     # ③ index-builder 一括実行（全 wiki パスをまとめて渡す）
     if deferred_wiki_paths:
         try:
-            index_builder_run(mode="add_batch", file_paths=deferred_wiki_paths)
+            index_builder_run(mode="batch_add", file_paths=deferred_wiki_paths)
         except Exception as e:
             flush_errors.append({"step": "index_builder", "error": str(e)})
 

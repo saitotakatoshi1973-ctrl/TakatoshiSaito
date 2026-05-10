@@ -13,6 +13,7 @@
 |--------|-----------|------|
 | `add` | `place-wiki.md`（都度） | 新規ファイルのembeddingを追加 ＋ 欠損チェック |
 | `batch_add` | `flush_batch_post_processing()`（バッチ末尾） | 複数ファイルを npz load/save 各1回で一括追加 ② |
+| `remove` | `check-integrity.md`（孤立wiki削除時） | 指定ファイルのembeddingをindexから削除 |
 | `rebuild` | `maintenance-agent`（週次） | KnowledgeBase/ 全体を走査して全件再構築 |
 
 ---
@@ -27,6 +28,10 @@ file_path: "KnowledgeBase/kyorindo/cx/strategy/CX推進ロードマップ_v4_202
 # 全件再構築モード（rebuild）
 mode: "rebuild"
 file_path: null
+
+# 削除モード（remove）
+mode: "remove"
+file_path: "KnowledgeBase/kyorindo/cx/strategy/CX推進ロードマップ_v4_20260501.md"
 ```
 
 ---
@@ -262,6 +267,46 @@ def batch_add_to_index(model: SentenceTransformer, file_paths: list[str]) -> dic
 
 ---
 
+## STEP 5-A3: 削除モード（remove）
+
+`check-integrity.md` が孤立wikiを削除した直後に呼び出す。
+指定ファイルが index に存在する場合だけ除去し、存在しない場合はスキップする。
+
+```python
+def remove_from_index(file_path: str) -> dict:
+    """
+    1件の wiki ファイルを index から削除する。
+    file_path: KnowledgeBase/ 配下の絶対パス
+    """
+    rel_path = os.path.relpath(file_path, KB_ROOT).replace("\\", "/")
+
+    paths, embeddings = load_index()
+    paths, embeddings = remove_missing(paths, embeddings)
+
+    if rel_path not in paths:
+        return {
+            "status": "skipped",
+            "mode": "remove",
+            "reason": "indexに存在しない",
+            "path": rel_path,
+            "total_entries": len(paths),
+        }
+
+    idx = paths.index(rel_path)
+    paths.pop(idx)
+    embeddings = np.delete(embeddings, idx, axis=0)
+    save_index(paths, embeddings)
+
+    return {
+        "status": "success",
+        "mode": "remove",
+        "path": rel_path,
+        "total_entries": len(paths),
+    }
+```
+
+---
+
 ## STEP 5-B: 全件再構築モード（rebuild）
 
 ```python
@@ -349,15 +394,14 @@ def save_index(paths: list[str], embeddings: np.ndarray, retries: int = 3, wait:
 def run(mode: str, file_path: str = None, file_paths: list[str] = None) -> dict:
     """
     index-builder.md のエントリポイント。
-    mode: "add" | "batch_add" | "rebuild"
-    file_path:  add モード時のみ必要（絶対パス）
+    mode: "add" | "batch_add" | "remove" | "rebuild"
+    file_path:  add / remove モード時のみ必要（絶対パス）
     file_paths: batch_add モード時のみ必要（絶対パスリスト）
     """
-    model = load_model()
-
     if mode == "add":
         if not file_path or not os.path.exists(file_path):
             return {"status": "error", "reason": f"ファイルが存在しません: {file_path}"}
+        model = load_model()
         return add_to_index(model, file_path)
 
     elif mode == "batch_add":
@@ -365,9 +409,16 @@ def run(mode: str, file_path: str = None, file_paths: list[str] = None) -> dict:
         # npz の load/save を1回に集約し、n 件追加でも I/O コストを O(1) に抑える
         if not file_paths:
             return {"status": "skipped", "reason": "file_paths が空"}
+        model = load_model()
         return batch_add_to_index(model, file_paths)
 
+    elif mode == "remove":
+        if not file_path:
+            return {"status": "error", "reason": "file_path が空"}
+        return remove_from_index(file_path)
+
     elif mode == "rebuild":
+        model = load_model()
         return rebuild_index(model)
 
     else:
@@ -391,6 +442,12 @@ mode: batch_add
 added: 8
 skipped: 0
 total_entries: 95
+
+# 削除モードの場合
+status: success
+mode: remove
+path: "kyorindo/cx/strategy/CX推進ロードマップ_v4_20260501.md"
+total_entries: 94
 
 # 全件再構築モードの場合
 status: success
@@ -432,6 +489,7 @@ pip install sentence-transformers numpy
 
 ```
 place-wiki.md（新規ファイル追加後）→ index-builder.md（mode: add）
+check-integrity.md（孤立wiki削除後）→ index-builder.md（mode: remove）
 maintenance-agent（週次）         → index-builder.md（mode: rebuild）
 analyze.md（類似検索）            → wiki-embeddings.npz を直接参照
 web-search.md（重複チェック）     → wiki-embeddings.npz を直接参照
