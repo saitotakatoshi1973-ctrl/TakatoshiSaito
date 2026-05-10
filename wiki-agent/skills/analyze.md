@@ -8,13 +8,23 @@
 4. `convert-binary.md` が必要か否か
 5. バイナリファイルの `00personal/` 移動先
 
+> **現行バッチでの位置づけ（Codex/Claudeコスト削減）**
+>
+> `batch-inbox.md` の正本低コスト経路では、通常このスキルを直接使わない。
+> 分類は `scripts/gemini_wiki_generator.py --analyze-only` に委譲し、
+> 本文生成は `scripts/gemini_wiki_generator.py --generate` に委譲する。
+>
+> この `analyze.md` は、Gemini分類が失敗した場合、低信頼度の場合、
+> または分類精度を優先したい重要資料の場合のフォールバックとして残す。
+> 本スキルを使うと Codex/Claude 側で分類判断を行うため、Gemini経路よりコストが高くなり得る。
+
 ## 参照ファイル
 
 - `KnowledgeBase/_system/SCHEMA.md` — カテゴリ定義・分類ルール
 - `KnowledgeBase/_system/learning/classification-hints.md` — 補足分類ルール（学習済み）
 
-> **バッチ処理時の注意（クレジット削減）**:
-> `batch-inbox.md` から呼び出された場合、これらのファイルは
+> **フォールバック分類時の注意（クレジット削減）**:
+> `batch-inbox.md` からフォールバックとして呼び出された場合、これらのファイルは
 > バッチ開始時に **1回だけ** 読み込み済みである。
 > ファイルごとに再読み込みしないこと（コンテキスト上のデータをそのまま使う）。
 > 単独で呼び出された場合（inbox-agent.md 経由など）のみ、ここで読み込む。
@@ -416,11 +426,23 @@ classification_method: hints | llm_score | embedding | user
 
 ---
 
-### バッチ統合モード（batch_write_wiki=True）① **クレジット削減**
+### バッチ統合モード（batch_write_wiki=True）① **旧コスト削減モード / 現行では原則非推奨**
 
 `write-wiki.md` を別呼び出ししない。
 **分類結果 ＋ wiki本文を1回のレスポンスで同時出力する。**
 `write-wiki.md` の呼び出しはスキップされ、そのまま `place-wiki.md` へ渡される。
+
+> **重要**
+>
+> このモードは `write-wiki.md` 呼び出し回数を削るための旧仕様である。
+> ただし、分類と本文生成を `analyze.md` が同時に担うため、
+> Codex/Claude 側のコンテキスト消費と生成コストは残る。
+>
+> 現行の `batch-inbox.md` 正本経路では、通常このモードを使わず、
+> `gemini_wiki_generator.py --analyze-only` で分類し、
+> `gemini_wiki_generator.py --generate` で本文生成する。
+> このモードは Gemini 経路が失敗した場合や、分類精度を優先して
+> `analyze.md` に戻したい場合のフォールバックとして扱う。
 
 #### 出力フォーマット
 
@@ -459,8 +481,8 @@ classification_method: hints | llm_score | embedding | user
 - 元資料にない内容を推測して書かない
 - 文体は「である調」で統一する
 
-> **注意**: このモードは `batch_auto_classify=True` のバッチ処理専用。
-> 単独処理・詳細確認が必要なケースには通常モード（batch_write_wiki=False）を使うこと。
+> **注意**: このモードは旧バッチ処理専用。
+> Codex/Claude 側コストを抑えたい通常バッチでは使わない。
 
 ---
 

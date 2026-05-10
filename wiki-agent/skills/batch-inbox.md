@@ -34,7 +34,7 @@
 | `wiki_score_threshold` | — | `6` | wiki_filter 有効時の採用スコア下限（0〜10） |
 | `wiki_detail_level` | — | `"summary"` | wikiの詳細度。`"summary"`（箇条書き中心・短め）/ `"full"`（全テンプレート・詳細） |
 | `batch_auto_classify` | — | `true` | `true` = 信頼度 < 6 でも自動進行しレビューリストに記録。`false` = 従来通りユーザー確認で停止 |
-| `use_gemini` | — | `true` | write-wiki を Gemini 2.5 Flash API に委譲する（低コスト・Excel/PPTX実内容読取）。`false` にすると Claude で生成 |
+| `use_gemini` | — | `true` | 分類と本文生成を `gemini_wiki_generator.py` に委譲する。Codex/Claude側コストを抑えるため、通常は `true` を使う |
 
 ---
 
@@ -117,15 +117,18 @@ def hydrate_cloud_file(path: str, timeout: int = 300, wait: int = 5) -> bool:
 # Read: wiki-agent/skills/convert-binary.md
 # Read: wiki-agent/skills/analyze.md
 # Read: wiki-agent/skills/place-wiki.md
-# ※ write-wiki.md は batch_write_wiki=True のため呼び出し不要（analyze.md が統合実行）
+# ※ 現行の正本低コスト経路では write-wiki.md を呼び出さない。
+#    分類は gemini_wiki_generator.py --analyze-only、
+#    本文生成は gemini_wiki_generator.py --generate に寄せる。
+#    analyze.md は Gemini 分類失敗・低信頼度・重要資料のフォールバックとして残す。
 
 # ── 分類ルール（全ファイル共通）──
 # Read: KnowledgeBase/_system/SCHEMA.md               ← full版（1回だけ読む）
 # Read: KnowledgeBase/_system/learning/classification-hints.md
 
-# ── ② スリム SCHEMA を動的生成（SCHEMA.md 読み込み直後に実行）──
+# ── ② フォールバック用スリム SCHEMA を動的生成（SCHEMA.md 読み込み直後に実行）──
 # slim_schema = generate_slim_schema(schema_content)
-# → analyze.md の STEP 4 では full SCHEMA.md の代わりに slim_schema を参照
+# → Gemini分類が失敗して analyze.md に戻す場合のみ、full SCHEMA.md の代わりに slim_schema を参照
 # → SCHEMA.md が更新されても次回バッチ時に自動追従（別ファイル管理不要）
 ```
 
@@ -136,11 +139,11 @@ def hydrate_cloud_file(path: str, timeout: int = 300, wait: int = 5) -> bool:
 
 ---
 
-## スリム SCHEMA 動的生成（② クレジット削減）
+## スリム SCHEMA 動的生成（② analyze.mdフォールバック時のクレジット削減）
 
 SCHEMA.md を読み込んだ直後に `generate_slim_schema()` を呼び出す。
 full SCHEMA.md（~2200トークン）の代わりに slim 版（~900トークン）を
-analyze.md STEP 4 に渡すことで、1ファイルあたりの分類コストを約60%削減する。
+analyze.md フォールバック時の STEP 4 に渡すことで、1ファイルあたりの分類コストを約60%削減する。
 SCHEMA.md が更新されれば次回バッチ時に自動追従するため、別ファイル管理は不要。
 
 ```python
@@ -771,12 +774,30 @@ def run_batch(
     """
     to_process の各ファイルを wiki 化する。1ファイルずつ直列で処理する。
 
-    クレジット削減のため batch_mode=True を place-wiki に渡し、
+    【現行の正本低コスト経路】
+    use_gemini=True の場合は、Codex/Claude 側で分類・本文生成を行わない。
+    代わりに Python スクリプト `gemini_wiki_generator.py` を2段階で呼び出す。
+
+      1. --analyze-only
+         - SCHEMA.md と classification-hints.md を読み、保存先・wiki_type・title をJSONで返す。
+         - `--emit-usage` を付け、Gemini 側の token usage をログ化する。
+         - destination が SCHEMA 候補外、wiki_type が許可外、confidence_score < 6 の場合は
+           needs_review=true として扱い、必要に応じて analyze.md フォールバックへ回す。
+
+      2. --generate
+         - --analyze-only の分類結果を受け取り、本文Markdownだけを生成する。
+         - Front-matter と保存処理は place-wiki.md の batch_write_wiki 相当処理で行う。
+         - ここでも `--emit-usage` を付け、本文生成のGemini使用量を記録する。
+
+    【フォールバック経路】
+    Gemini分類が失敗した場合、またはユーザーが分類精度を優先する場合は analyze.md を使う。
+    ただし analyze.md の batch_write_wiki=True は分類＋本文生成をCodex/Claude側で統合するため、
+    Codex/Claudeコストが大きくなる。通常バッチでは使わない。
+
+    【後処理の一括化】
+    クレジットとI/Oを抑えるため batch_mode=True を place-wiki に渡し、
     _overview.md 更新・change_log 追記・index-builder 呼び出しを
     処理ループ内では行わず、後で flush_batch_post_processing() にまとめる。
-
-    batch_auto_classify=True の場合、信頼度 < 6 のファイルも自動進行し
-    auto_classified_list に記録する（バッチ後にまとめてレビュー可能）。
     """
     auto_classified = []   # 低信頼度で自動進行したファイルのリスト
     cached_texts = filtered.get("cached_texts", {})  # ① 変換テキストキャッシュ（partial再処理時に再利用）
@@ -802,9 +823,14 @@ def run_batch(
             errors.append({"file": rel_path, "step": "copy", "error": str(e)})
             continue
 
-        # STEP 5: パイプラインを呼び出す
-        # batch_mode=True により place-wiki は overview/changelog/index を
-        # 即時実行せず deferred_* リストに積んで返す
+        # STEP 5: 低コスト Gemini パイプラインを呼び出す
+        #
+        # 重要:
+        # - 旧仕様の `batch_write_wiki=True` は analyze.md に分類＋本文生成をまとめるため、
+        #   write-wiki.md は発動しない一方で Codex/Claude 側コストは残る。
+        # - 現行方針では、この重い処理を Python/Gemini 側へ逃がす。
+        # - place-wiki.md には最終的な wiki_content と分類結果だけを渡し、
+        #   保存・processed-sources・一括後処理キュー作成を任せる。
         pipeline_input = {
             "file_path":              inbox_copy,
             "original_personal_path": rel_path,
@@ -814,23 +840,40 @@ def run_batch(
             "wiki_detail_level":      wiki_detail_level,   # ← summary / full
             "batch_auto_classify":    batch_auto_classify, # ← 低信頼度自動進行
             "cached_text":            cached_texts.get(abs_path),  # ① キャッシュヒット時は変換スキップ
-            "use_gemini":             use_gemini,          # ← Geminiモード
-            "source_file_abs_path":   abs_path,            # ← Gemini用・元ファイルパス
-            "batch_write_wiki":       True,          # ① analyze + write-wiki を1回のLLM呼び出しに統合
+            "use_gemini":             use_gemini,          # ← trueなら分類・本文生成をgemini_wiki_generator.pyへ委譲
+            "source_file_abs_path":   abs_path,            # ← Geminiが直接読む元ファイルパス
+            "gemini_analyze_command": [
+                "python", "scripts/gemini_wiki_generator.py", abs_path,
+                "--analyze-only", "--emit-usage",
+            ],
+            "gemini_generate_command": [
+                "python", "scripts/gemini_wiki_generator.py", abs_path,
+                "--generate", "--emit-usage",
+                "--analysis-json", "{analysis_json}",
+            ],
+            "batch_write_wiki":       False,         # ← 旧統合モードは通常使わない。analyze.mdフォールバック時のみ検討
             "slim_schema":            slim_schema,   # ② 動的生成スリムSCHEMA（analyze STEP 4 で使用）
         }
-        # ── パイプライン実行順序（batch_write_wiki=True 時）──
-        # 1. convert-binary.md  → テキスト抽出（cached_text があればスキップ）
-        # 2. analyze.md         → 分類判定 ＋ wiki本文を同時生成（STEP 6 統合モード）
-        #    ↳ write-wiki.md の呼び出しはスキップ（analyze.md が wiki_content を出力済み）
-        # 3. place-wiki.md      → analyze 統合出力の wiki_content を受け取って配置
+        # ── 現行パイプライン実行順序（use_gemini=True 時）──
+        # 1. convert-binary.md または gemini_wiki_generator.py 内部抽出
+        #    - 既存キャッシュがあれば再抽出を避ける。
+        #    - Gemini側でもファイルを直接読めるため、本文生成品質を優先する場合は source_file_abs_path を使う。
+        # 2. gemini_wiki_generator.py --analyze-only
+        #    - 分類結果JSONを取得する。
+        #    - usage_metadata をログ化し、Codex/ClaudeではなくGemini側の消費として計測する。
+        # 3. gemini_wiki_generator.py --generate
+        #    - 分類結果JSONを渡し、本文Markdownのみ取得する。
+        # 4. place-wiki.md
+        #    - Front-matter生成、wiki保存、processed-sources初期記録、後処理キュー作成を行う。
         #
         # pipeline_result に期待するフィールド:
         #   status / wiki_path / processed_record / auto_classified / confidence_score / destination
         #   extracted_text: convert-binary の出力テキスト（キャッシュ用・3000文字まで）← ①
 
         pipeline_result = run_inbox_pipeline(pipeline_input)
-        # ↑ convert-binary → analyze → write-wiki → place-wiki（batch_mode）の順に実行
+        # ↑ 実装時は use_gemini=True なら
+        #   convert/extract → gemini analyze → gemini generate → place-wiki
+        #   の順に実行する。analyze.md はフォールバック専用。
 
         # STEP 6: _inbox/ のコピーを削除
         try:
@@ -1135,14 +1178,15 @@ def run(
 
     # ② スリム SCHEMA を動的生成（バッチ開始時に1回だけ）
     # SCHEMA.md を読み込み → フォルダパス一覧を抽出 → slim_schema として保持
-    # analyze.md STEP 4 では full SCHEMA.md の代わりにこれを参照する
+    # 通常の Gemini 経路では gemini_wiki_generator.py が SCHEMA.md を直接読む。
+    # slim_schema は、Gemini分類が失敗して analyze.md にフォールバックする場合だけ使う。
     SCHEMA_PATH = os.path.join(KB_ROOT, "_system", "SCHEMA.md")
     try:
         with open(SCHEMA_PATH, "r", encoding="utf-8") as f:
             schema_content = f.read()
         slim_schema = generate_slim_schema(schema_content)
     except Exception:
-        slim_schema = None   # 生成失敗時は analyze.md が full SCHEMA.md を参照
+        slim_schema = None   # 生成失敗時の analyze.md フォールバックでは full SCHEMA.md を参照
 
     # STEP 1: スキャン（クラウド専用ファイルは後続で事前判定）
     scan_result = scan_target_dir(target_dir, recursive, file_types)
@@ -1261,13 +1305,21 @@ def run(
 
 ```
 batch-inbox.md（ユーザー起動）
-    ├─ _inbox/ にコピー
-    └─→ convert-binary.md       （テキスト抽出）
-        └─→ analyze.md          （分類判定）
-            └─→ write-wiki.md   （wiki生成）
-                └─→ place-wiki.md（後処理 / skip_route_binary=True）
+    ├─ _inbox/ に一時コピー
+    └─→ gemini_wiki_generator.py --analyze-only
+        ├─ 分類結果JSONを出力
+        ├─ SCHEMA.md / classification-hints.md を参照
+        └─ --emit-usage でGemini側使用量を記録
+            └─→ gemini_wiki_generator.py --generate
+                ├─ wiki本文Markdownを出力
+                └─ --emit-usage で本文生成コストを記録
+                    └─→ place-wiki.md（保存・後処理 / skip_route_binary=True）
                         ├─→ update-overview.md
                         ├─→ change_log に記録
                         ├─→ index-builder.md（add）
                         └─→ processed-sources.yaml に記録
 ```
+
+> フォールバック:
+> `gemini_wiki_generator.py --analyze-only` が失敗した場合、または分類結果が低信頼度の場合のみ、
+> `analyze.md` を使う。`analyze.md` は分類精度の保険として残すが、通常バッチの正本経路ではない。
