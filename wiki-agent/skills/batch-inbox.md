@@ -35,6 +35,7 @@
 | `wiki_detail_level` | — | `"summary"` | wikiの詳細度。`"summary"`（箇条書き中心・短め）/ `"full"`（全テンプレート・詳細） |
 | `batch_auto_classify` | — | `true` | `true` = 信頼度 < 6 でも自動進行しレビューリストに記録。`false` = 従来通りユーザー確認で停止 |
 | `use_gemini` | — | `true` | 分類と本文生成を `gemini_wiki_generator.py` に委譲する。Codex/Claude側コストを抑えるため、通常は `true` を使う |
+| `auto_confirm` | — | `true` | `true` = クラウドダウンロード・削除検出・処理プレビューをユーザー確認なしで自動進行。`false` = 各ポイントでユーザーに確認 |
 
 ---
 
@@ -669,7 +670,10 @@ def detect_deleted_sources(target_dir: str, current_files: list[str]) -> list[di
     return deleted
 ```
 
-削除が検出された場合、**処理開始前に**ユーザーへ確認する：
+削除が検出された場合の処理：
+
+- **`auto_confirm=True`（デフォルト）**: ユーザー確認なしで自動的に **B（status: outdated に更新して残す）** を適用し、処理を継続する。
+- **`auto_confirm=False`**: 処理開始前にユーザーへ確認する（下記プロンプト）。
 
 ```
 ⚠️ 削除されたソースファイルが見つかりました（{N}件）
@@ -690,6 +694,31 @@ A / B / C で回答してください:
 | B. outdated更新 | Front-matterの `status: outdated` に変更 | `source_deleted: true` を追記 |
 | C. 何もしない | そのまま | `source_deleted: true` を追記（次回警告なし） |
 
+```python
+def handle_deleted_sources(deleted: list[dict], auto_confirm: bool = True) -> None:
+    """
+    削除されたソースファイルの wiki を処理する。
+    auto_confirm=True の場合は確認なしで B（outdated更新）を自動適用。
+    """
+    if not deleted:
+        return
+
+    if auto_confirm:
+        # 自動: B（status: outdated）を適用
+        print(f"⚠️  削除済みソース {len(deleted)}件 → status: outdated に自動更新")
+        for record in deleted:
+            _apply_outdated(record)   # wiki の Front-matter を status: outdated に更新
+        return
+
+    # 手動確認フロー（auto_confirm=False 時のみ）
+    print(f"\n⚠️ 削除されたソースファイルが見つかりました（{len(deleted)}件）\n")
+    for i, record in enumerate(deleted, 1):
+        print(f"  {i}. {record['source_path']}")
+        print(f"       → wiki: {record.get('wiki_path', '不明')}")
+    print("\nA. wikiを削除 / B. outdated更新（推奨）/ C. 何もしない: ", end="")
+    # ← ユーザー回答を受け取り A/B/C に応じて _apply_delete/_apply_outdated/_skip を呼ぶ
+```
+
 ---
 
 ## STEP 3: 処理予定をユーザーに提示・確認する
@@ -700,12 +729,13 @@ def show_preview(
     filtered: dict,
     max_files: int,
     screen_result: dict | None = None,
+    auto_confirm: bool = True,
 ) -> list[str]:
     """
-    処理予定ファイルを表示してユーザーの確認を取る。
-    screen_result が渡された場合はスクリーニング統計も表示する。
-    確認後、処理対象の絶対パスリストを返す。
-    空リストはキャンセル。
+    処理予定ファイルを表示する。
+    auto_confirm=True の場合は確認プロンプトなしで自動進行。
+    auto_confirm=False の場合はユーザーの確認を取る。
+    確認後、処理対象の絶対パスリストを返す。空リストはキャンセル。
     """
     # new / updated / partial を合わせて max_files 件まで
     to_process = (
@@ -748,6 +778,12 @@ def show_preview(
         print("\n処理対象ファイルはありません。")
         return []
 
+    if auto_confirm:
+        # 自動進行: 確認プロンプトをスキップしてそのまま処理へ
+        print("\n✅ 自動進行（auto_confirm=True）: 処理を開始します")
+        return to_process
+
+    # 手動確認フロー（auto_confirm=False 時のみ）
     print(f"""
 進めますか？
   1. 進める
@@ -1168,6 +1204,7 @@ def run(
     wiki_detail_level: str    = "summary",   # ← ⑤で追加
     batch_auto_classify: bool = True,        # ← ⑦で追加
     use_gemini: bool          = True,        # ← Geminiモード（write-wiki をGeminiに委譲）デフォルトON
+    auto_confirm: bool        = True,        # ← ユーザー確認プロンプトをすべてスキップ
 ) -> dict:
     # 絶対パスに正規化
     if not os.path.isabs(target_dir):
@@ -1241,16 +1278,16 @@ def run(
         if newly_rejected:
             save_filter_rejections(newly_rejected)
 
-    # STEP 2.5: 削除検出 → ユーザー確認
+    # STEP 2.5: 削除検出 → 確認（auto_confirm=True なら B を自動適用）
     deleted = detect_deleted_sources(target_dir, all_files)
     if deleted:
-        handle_deleted_sources(deleted)   # ユーザーに A/B/C を確認して処理
+        handle_deleted_sources(deleted, auto_confirm=auto_confirm)
 
     # STEP 2: 未処理フィルタ
     filtered = filter_files(all_files)
 
-    # STEP 3: プレビュー・確認（スクリーニング結果も合わせて表示）
-    to_process = show_preview(target_dir, filtered, max_files, screen_result)
+    # STEP 3: プレビュー表示（auto_confirm=True なら確認プロンプトをスキップ）
+    to_process = show_preview(target_dir, filtered, max_files, screen_result, auto_confirm=auto_confirm)
     if not to_process:
         return {"status": "cancelled", "message": "処理をキャンセルしました"}
 
