@@ -27,7 +27,7 @@
 | パラメータ | 必須 | デフォルト | 説明 |
 |-----------|------|-----------|------|
 | `target_dir` | ✅ | — | 00personal 相対パス または 絶対パス |
-| `recursive` | — | `false` | サブフォルダも再帰的に処理するか |
+| `recursive` | — | `true` | サブフォルダも再帰的に処理するか。`false` にすると直下のみ |
 | `file_types` | — | `pptx,xlsx,pdf,md,txt` | 対象拡張子（カンマ区切り） |
 | `max_files` | — | `10` | 1回の処理上限件数（未処理+再処理の合計） |
 | `wiki_filter` | — | `true` | LLM事前スクリーニングで低価値ファイルを除外するか。`false` にすると全件処理 |
@@ -1117,7 +1117,7 @@ def _resolve_collision(dest_path: str) -> str:
 ```python
 def run(
     target_dir: str,
-    recursive: bool      = False,
+    recursive: bool      = True,             # ← デフォルトON（サブフォルダも再帰処理）
     file_types: set[str] = DEFAULT_FILE_TYPES,
     max_files: int        = 20,              # ← 10→20（⑨の変更）
     wiki_filter: bool     = True,            # ← デフォルトON（低価値ファイルを自動除外）
