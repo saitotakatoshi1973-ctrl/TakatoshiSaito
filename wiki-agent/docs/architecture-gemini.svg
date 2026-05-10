@@ -1,0 +1,214 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 1100" width="960" height="1100" font-family="'Segoe UI', Meiryo, sans-serif">
+
+  <!-- 背景 -->
+  <rect width="960" height="1100" fill="#f8f9fa"/>
+
+  <!-- タイトル -->
+  <text x="480" y="36" text-anchor="middle" font-size="20" font-weight="bold" fill="#1a1a2e">Wiki Agent アーキテクチャ（Gemini統合版）</text>
+  <text x="480" y="56" text-anchor="middle" font-size="12" fill="#666">2026-05-10</text>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- 1. Claude Code（ユーザー対話層） -->
+  <!-- ═══════════════════════════════════════════ -->
+  <rect x="200" y="72" width="560" height="52" rx="8" fill="#4a4e69" stroke="#22223b" stroke-width="1.5"/>
+  <text x="480" y="92" text-anchor="middle" font-size="13" font-weight="bold" fill="white">Claude Code</text>
+  <text x="480" y="110" text-anchor="middle" font-size="11" fill="#c9cde0">ユーザーとの対話 / オーケストレーション</text>
+
+  <!-- 矢印↓ -->
+  <line x1="480" y1="124" x2="480" y2="148" stroke="#888" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="490" y="140" font-size="10" fill="#888">Skill ツール</text>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- 2. スキル層 -->
+  <!-- ═══════════════════════════════════════════ -->
+  <rect x="40" y="148" width="880" height="200" rx="8" fill="#e8eaf6" stroke="#5c6bc0" stroke-width="1.5"/>
+  <text x="480" y="170" text-anchor="middle" font-size="13" font-weight="bold" fill="#283593">スキル層（.md）</text>
+
+  <!-- ユーザー向けスキル -->
+  <rect x="60" y="180" width="200" height="148" rx="6" fill="#c5cae9" stroke="#5c6bc0" stroke-width="1"/>
+  <text x="160" y="200" text-anchor="middle" font-size="11" font-weight="bold" fill="#1a237e">ユーザー向けスキル</text>
+  <rect x="75" y="210" width="170" height="30" rx="4" fill="#7986cb" stroke="none"/>
+  <text x="160" y="230" text-anchor="middle" font-size="11" fill="white">wiki-inbox</text>
+  <rect x="75" y="248" width="170" height="30" rx="4" fill="#7986cb" stroke="none"/>
+  <text x="160" y="268" text-anchor="middle" font-size="11" fill="white">wiki-batch</text>
+  <rect x="75" y="286" width="170" height="30" rx="4" fill="#7986cb" stroke="none"/>
+  <text x="160" y="306" text-anchor="middle" font-size="11" fill="white">inbox-agent.md（エージェント）</text>
+
+  <!-- インフラスキル -->
+  <rect x="340" y="180" width="560" height="148" rx="6" fill="#c5cae9" stroke="#5c6bc0" stroke-width="1"/>
+  <text x="620" y="200" text-anchor="middle" font-size="11" font-weight="bold" fill="#1a237e">インフラスキル</text>
+
+  <!-- スキル一覧 左列 -->
+  <rect x="355" y="210" width="160" height="24" rx="3" fill="#9fa8da"/>
+  <text x="435" y="226" text-anchor="middle" font-size="10" fill="#1a237e">convert-binary.md</text>
+  <rect x="355" y="238" width="160" height="24" rx="3" fill="#9fa8da"/>
+  <text x="435" y="254" text-anchor="middle" font-size="10" fill="#1a237e">analyze.md</text>
+  <rect x="355" y="266" width="160" height="24" rx="3" fill="#9fa8da"/>
+  <text x="435" y="282" text-anchor="middle" font-size="10" fill="#1a237e">write-wiki.md</text>
+  <rect x="355" y="294" width="160" height="24" rx="3" fill="#9fa8da"/>
+  <text x="435" y="310" text-anchor="middle" font-size="10" fill="#1a237e">place-wiki.md</text>
+
+  <!-- スキル一覧 右列 -->
+  <rect x="525" y="210" width="160" height="24" rx="3" fill="#9fa8da"/>
+  <text x="605" y="226" text-anchor="middle" font-size="10" fill="#1a237e">update-overview.md</text>
+  <rect x="525" y="238" width="160" height="24" rx="3" fill="#9fa8da"/>
+  <text x="605" y="254" text-anchor="middle" font-size="10" fill="#1a237e">update-changelog.md</text>
+  <rect x="525" y="266" width="160" height="24" rx="3" fill="#9fa8da"/>
+  <text x="605" y="282" text-anchor="middle" font-size="10" fill="#1a237e">index-builder.md</text>
+  <rect x="525" y="294" width="160" height="24" rx="3" fill="#9fa8da"/>
+  <text x="605" y="310" text-anchor="middle" font-size="10" fill="#1a237e">route-binary.md</text>
+
+  <!-- スキル一覧 右端列 -->
+  <rect x="695" y="210" width="190" height="24" rx="3" fill="#9fa8da"/>
+  <text x="790" y="226" text-anchor="middle" font-size="10" fill="#1a237e">record-feedback.md</text>
+  <rect x="695" y="238" width="190" height="24" rx="3" fill="#9fa8da"/>
+  <text x="790" y="254" text-anchor="middle" font-size="10" fill="#1a237e">sync-personal.md</text>
+  <rect x="695" y="266" width="190" height="24" rx="3" fill="#9fa8da"/>
+  <text x="790" y="282" text-anchor="middle" font-size="10" fill="#1a237e">web-search.md</text>
+  <rect x="695" y="294" width="190" height="24" rx="3" fill="#9fa8da"/>
+  <text x="790" y="310" text-anchor="middle" font-size="10" fill="#1a237e">learn-from-feedback.md</text>
+
+  <!-- 矢印↓ -->
+  <line x1="480" y1="348" x2="480" y2="372" stroke="#888" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <text x="490" y="364" font-size="10" fill="#888">Bash ツール</text>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- 3. Python スクリプト層 -->
+  <!-- ═══════════════════════════════════════════ -->
+  <rect x="40" y="372" width="880" height="240" rx="8" fill="#e8f5e9" stroke="#388e3c" stroke-width="1.5"/>
+  <text x="480" y="394" text-anchor="middle" font-size="13" font-weight="bold" fill="#1b5e20">Python スクリプト層</text>
+
+  <!-- 既存スクリプト群 -->
+  <rect x="60" y="404" width="480" height="190" rx="6" fill="#c8e6c9" stroke="#388e3c" stroke-width="1"/>
+  <text x="300" y="422" text-anchor="middle" font-size="11" font-weight="bold" fill="#1b5e20">既存スクリプト</text>
+
+  <rect x="75" y="430" width="220" height="70" rx="4" fill="#a5d6a7" stroke="#388e3c" stroke-width="1"/>
+  <text x="185" y="448" text-anchor="middle" font-size="10" font-weight="bold" fill="#1b5e20">mcp-servers/cybermail-imap/</text>
+  <text x="185" y="466" text-anchor="middle" font-size="10" fill="#2e7d32">server.py（MCPサーバー）</text>
+  <text x="185" y="482" text-anchor="middle" font-size="10" fill="#2e7d32">sync.py（メール同期）</text>
+
+  <rect x="75" y="508" width="220" height="42" rx="4" fill="#a5d6a7" stroke="#388e3c" stroke-width="1"/>
+  <text x="185" y="524" text-anchor="middle" font-size="10" font-weight="bold" fill="#1b5e20">mcp-servers/skills/important-mail/</text>
+  <text x="185" y="540" text-anchor="middle" font-size="10" fill="#2e7d32">export_important_mail_top50.py</text>
+
+  <rect x="75" y="558" width="220" height="28" rx="4" fill="#a5d6a7" stroke="#388e3c" stroke-width="1"/>
+  <text x="185" y="572" text-anchor="middle" font-size="10" font-weight="bold" fill="#1b5e20">kyorindo-cx/</text>
+  <text x="185" y="584" text-anchor="middle" font-size="10" fill="#2e7d32">generate_dx_benchmark.py</text>
+
+  <!-- 比較ラベル -->
+  <text x="340" y="476" text-anchor="middle" font-size="10" fill="#888">LLM: なし</text>
+  <text x="340" y="536" text-anchor="middle" font-size="10" fill="#888">LLM: なし</text>
+  <text x="340" y="576" text-anchor="middle" font-size="10" fill="#888">LLM: なし</text>
+
+  <!-- Geminiスクリプト（NEW） -->
+  <rect x="560" y="404" width="340" height="190" rx="6" fill="#fff9c4" stroke="#f57f17" stroke-width="2"/>
+  <rect x="575" y="412" width="60" height="20" rx="3" fill="#f57f17"/>
+  <text x="605" y="426" text-anchor="middle" font-size="10" font-weight="bold" fill="white">★ NEW</text>
+  <text x="730" y="430" text-anchor="middle" font-size="11" font-weight="bold" fill="#e65100">wiki-agent/scripts/</text>
+
+  <rect x="575" y="438" width="310" height="140" rx="4" fill="#fff3e0" stroke="#f57f17" stroke-width="1.5"/>
+  <text x="730" y="458" text-anchor="middle" font-size="11" font-weight="bold" fill="#bf360c">gemini_wiki_generator.py</text>
+
+  <rect x="585" y="466" width="140" height="20" rx="3" fill="#ffe082"/>
+  <text x="655" y="480" text-anchor="middle" font-size="10" fill="#6d4c00">openpyxl → Excel読取</text>
+  <rect x="585" y="490" width="140" height="20" rx="3" fill="#ffe082"/>
+  <text x="655" y="504" text-anchor="middle" font-size="10" fill="#6d4c00">python-pptx → PPTX読取</text>
+  <rect x="585" y="514" width="140" height="20" rx="3" fill="#ffe082"/>
+  <text x="655" y="528" text-anchor="middle" font-size="10" fill="#6d4c00">pymupdf → PDF読取</text>
+
+  <text x="730" y="476" text-anchor="middle" font-size="10" fill="#5d4037">↓ Gemini API</text>
+  <text x="730" y="494" text-anchor="middle" font-size="10" fill="#5d4037">wiki Markdown生成</text>
+  <text x="730" y="514" text-anchor="middle" font-size="10" fill="#5d4037">KnowledgeBase保存</text>
+  <text x="730" y="534" text-anchor="middle" font-size="10" fill="#5d4037">YAML更新</text>
+
+  <text x="730" y="562" text-anchor="middle" font-size="10" fill="#e65100">LLM: Gemini 2.5 Flash ✅</text>
+
+  <!-- 矢印↓ -->
+  <line x1="320" y1="612" x2="320" y2="636" stroke="#888" stroke-width="1.5" marker-end="url(#arrow)"/>
+  <line x1="730" y1="612" x2="730" y2="636" stroke="#f57f17" stroke-width="2" marker-end="url(#arrow-orange)"/>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- 4. 外部API層 -->
+  <!-- ═══════════════════════════════════════════ -->
+  <rect x="40" y="636" width="880" height="110" rx="8" fill="#fce4ec" stroke="#c2185b" stroke-width="1.5"/>
+  <text x="480" y="658" text-anchor="middle" font-size="13" font-weight="bold" fill="#880e4f">外部API / LLM</text>
+
+  <rect x="60" y="668" width="240" height="60" rx="6" fill="#f8bbd0" stroke="#c2185b" stroke-width="1"/>
+  <text x="180" y="690" text-anchor="middle" font-size="11" font-weight="bold" fill="#880e4f">Claude API</text>
+  <text x="180" y="710" text-anchor="middle" font-size="10" fill="#ad1457">Claude Code 本体</text>
+  <text x="180" y="724" text-anchor="middle" font-size="10" fill="#ad1457">スキル実行エンジン</text>
+
+  <rect x="360" y="668" width="240" height="60" rx="6" fill="#fff3e0" stroke="#f57f17" stroke-width="2"/>
+  <rect x="370" y="668" width="60" height="18" rx="3" fill="#f57f17"/>
+  <text x="400" y="681" text-anchor="middle" font-size="9" font-weight="bold" fill="white">★ NEW</text>
+  <text x="480" y="692" text-anchor="middle" font-size="11" font-weight="bold" fill="#e65100">Gemini API</text>
+  <text x="480" y="710" text-anchor="middle" font-size="10" fill="#bf360c">gemini-2.5-flash</text>
+  <text x="480" y="724" text-anchor="middle" font-size="10" fill="#bf360c">wiki生成エンジン</text>
+
+  <rect x="660" y="668" width="240" height="60" rx="6" fill="#f8bbd0" stroke="#c2185b" stroke-width="1"/>
+  <text x="780" y="690" text-anchor="middle" font-size="11" font-weight="bold" fill="#880e4f">Cybermail IMAP</text>
+  <text x="780" y="710" text-anchor="middle" font-size="10" fill="#ad1457">メール取得</text>
+  <text x="780" y="724" text-anchor="middle" font-size="10" fill="#ad1457">cybermail-imap/server.py</text>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- 5. 現在 vs 将来 -->
+  <!-- ═══════════════════════════════════════════ -->
+  <rect x="40" y="772" width="880" height="300" rx="8" fill="#f3e5f5" stroke="#7b1fa2" stroke-width="1.5"/>
+  <text x="480" y="794" text-anchor="middle" font-size="13" font-weight="bold" fill="#4a148c">現状の位置づけと将来計画</text>
+
+  <!-- 現在 -->
+  <rect x="60" y="804" width="400" height="250" rx="6" fill="#e1bee7" stroke="#7b1fa2" stroke-width="1"/>
+  <text x="260" y="824" text-anchor="middle" font-size="12" font-weight="bold" fill="#4a148c">【現在】スタンドアロン</text>
+
+  <rect x="75" y="834" width="370" height="30" rx="4" fill="#ce93d8"/>
+  <text x="260" y="854" text-anchor="middle" font-size="10" fill="#1a1a2e">wiki-batch スキル（Claude主体）</text>
+  <line x1="260" y1="864" x2="260" y2="888" stroke="#7b1fa2" stroke-width="1.5" marker-end="url(#arrow-purple)"/>
+  <rect x="75" y="888" width="370" height="30" rx="4" fill="#ce93d8"/>
+  <text x="260" y="908" text-anchor="middle" font-size="10" fill="#1a1a2e">Excel/PPTX：読めない → ファイル名から推定</text>
+  <line x1="260" y1="918" x2="260" y2="942" stroke="#7b1fa2" stroke-width="1.5" marker-end="url(#arrow-purple)"/>
+  <rect x="75" y="942" width="370" height="30" rx="4" fill="#ce93d8"/>
+  <text x="260" y="962" text-anchor="middle" font-size="10" fill="#1a1a2e">gemini_wiki_generator.py（手動呼び出し）</text>
+  <line x1="260" y1="972" x2="260" y2="996" stroke="#7b1fa2" stroke-width="1.5" marker-end="url(#arrow-purple)"/>
+  <rect x="75" y="996" width="370" height="30" rx="4" fill="#ce93d8"/>
+  <text x="260" y="1016" text-anchor="middle" font-size="10" fill="#1a1a2e">KnowledgeBase / YAML 更新</text>
+
+  <text x="260" y="1048" text-anchor="middle" font-size="10" fill="#6a1b9a">コスト: Claude Sonnet ≒ $1〜$3 / 100件</text>
+
+  <!-- 将来 -->
+  <rect x="480" y="804" width="420" height="250" rx="6" fill="#e1bee7" stroke="#7b1fa2" stroke-width="1"/>
+  <text x="690" y="824" text-anchor="middle" font-size="12" font-weight="bold" fill="#4a148c">【将来】wiki-batch 統合</text>
+
+  <rect x="495" y="834" width="390" height="30" rx="4" fill="#ba68c8"/>
+  <text x="690" y="854" text-anchor="middle" font-size="10" fill="white">wiki-batch スキル（Claude管理のみ）</text>
+  <line x1="690" y1="864" x2="690" y2="888" stroke="#7b1fa2" stroke-width="1.5" marker-end="url(#arrow-purple)"/>
+  <rect x="495" y="888" width="390" height="30" rx="4" fill="#ba68c8"/>
+  <text x="690" y="908" text-anchor="middle" font-size="10" fill="white">gemini_wiki_generator.py（バッチ版・自動）</text>
+  <line x1="690" y1="918" x2="690" y2="942" stroke="#7b1fa2" stroke-width="1.5" marker-end="url(#arrow-purple)"/>
+  <rect x="495" y="942" width="390" height="30" rx="4" fill="#ba68c8"/>
+  <text x="690" y="962" text-anchor="middle" font-size="10" fill="white">Excel/PPTX/PDF 実内容読取 → wiki生成</text>
+  <line x1="690" y1="972" x2="690" y2="996" stroke="#7b1fa2" stroke-width="1.5" marker-end="url(#arrow-purple)"/>
+  <rect x="495" y="996" width="390" height="30" rx="4" fill="#ba68c8"/>
+  <text x="690" y="1016" text-anchor="middle" font-size="10" fill="white">KnowledgeBase / YAML / overview 更新</text>
+
+  <text x="690" y="1048" text-anchor="middle" font-size="10" fill="#6a1b9a">コスト: Gemini 2.5 Flash ≒ $0.05〜$0.20 / 100件</text>
+
+  <!-- 矢印（現在→将来） -->
+  <line x1="450" y1="940" x2="478" y2="940" stroke="#f57f17" stroke-width="2" marker-end="url(#arrow-orange)"/>
+  <text x="462" y="932" text-anchor="middle" font-size="10" fill="#e65100">移行</text>
+
+  <!-- ═══════════════════════════════════════════ -->
+  <!-- 矢印マーカー定義 -->
+  <!-- ═══════════════════════════════════════════ -->
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#888"/>
+    </marker>
+    <marker id="arrow-orange" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#f57f17"/>
+    </marker>
+    <marker id="arrow-purple" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#7b1fa2"/>
+    </marker>
+  </defs>
+
+</svg>

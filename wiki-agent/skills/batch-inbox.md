@@ -30,10 +30,11 @@
 | `recursive` | — | `false` | サブフォルダも再帰的に処理するか |
 | `file_types` | — | `pptx,xlsx,pdf,md,txt` | 対象拡張子（カンマ区切り） |
 | `max_files` | — | `10` | 1回の処理上限件数（未処理+再処理の合計） |
-| `wiki_filter` | — | `false` | LLM事前スクリーニングで低価値ファイルを除外するか |
+| `wiki_filter` | — | `true` | LLM事前スクリーニングで低価値ファイルを除外するか。`false` にすると全件処理 |
 | `wiki_score_threshold` | — | `6` | wiki_filter 有効時の採用スコア下限（0〜10） |
 | `wiki_detail_level` | — | `"summary"` | wikiの詳細度。`"summary"`（箇条書き中心・短め）/ `"full"`（全テンプレート・詳細） |
 | `batch_auto_classify` | — | `true` | `true` = 信頼度 < 6 でも自動進行しレビューリストに記録。`false` = 従来通りユーザー確認で停止 |
+| `use_gemini` | — | `true` | write-wiki を Gemini 2.5 Flash API に委譲する（低コスト・Excel/PPTX実内容読取）。`false` にすると Claude で生成 |
 
 ---
 
@@ -764,6 +765,7 @@ def run_batch(
     filtered: dict,
     wiki_detail_level:   str       = "summary",
     batch_auto_classify: bool      = True,
+    use_gemini:          bool      = True,
     slim_schema:         str|None  = None,    # ② 動的生成スリムSCHEMA
 ) -> dict:
     """
@@ -812,6 +814,8 @@ def run_batch(
             "wiki_detail_level":      wiki_detail_level,   # ← summary / full
             "batch_auto_classify":    batch_auto_classify, # ← 低信頼度自動進行
             "cached_text":            cached_texts.get(abs_path),  # ① キャッシュヒット時は変換スキップ
+            "use_gemini":             use_gemini,          # ← Geminiモード
+            "source_file_abs_path":   abs_path,            # ← Gemini用・元ファイルパス
             "batch_write_wiki":       True,          # ① analyze + write-wiki を1回のLLM呼び出しに統合
             "slim_schema":            slim_schema,   # ② 動的生成スリムSCHEMA（analyze STEP 4 で使用）
         }
@@ -1116,10 +1120,11 @@ def run(
     recursive: bool      = False,
     file_types: set[str] = DEFAULT_FILE_TYPES,
     max_files: int        = 20,              # ← 10→20（⑨の変更）
-    wiki_filter: bool     = False,
+    wiki_filter: bool     = True,            # ← デフォルトON（低価値ファイルを自動除外）
     wiki_score_threshold: int = 6,
     wiki_detail_level: str    = "summary",   # ← ⑤で追加
     batch_auto_classify: bool = True,        # ← ⑦で追加
+    use_gemini: bool          = True,        # ← Geminiモード（write-wiki をGeminiに委譲）デフォルトON
 ) -> dict:
     # 絶対パスに正規化
     if not os.path.isabs(target_dir):
@@ -1211,6 +1216,7 @@ def run(
         filtered,
         wiki_detail_level    = wiki_detail_level,
         batch_auto_classify  = batch_auto_classify,
+        use_gemini           = use_gemini,
         slim_schema          = slim_schema,          # ② 動的生成スリムSCHEMA
     )
     result["cloud_files"] = len(cloud_files)

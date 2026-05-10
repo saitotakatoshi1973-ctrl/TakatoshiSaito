@@ -28,6 +28,9 @@ classification_confidence: 9
 classification_method: "llm_scoring"
 converted_text: "（convert-binary.md が変換したテキスト）"
 detail_level: "summary"   # "summary"（バッチ時デフォルト）/ "full"（詳細執筆）
+# ── Gemini モード用（オプション） ──
+use_gemini: true               # デフォルトON。false にすると Claude で生成
+source_file_abs_path: ""       # 元ファイルの絶対パス（use_gemini=true 時に使用）
 ```
 
 ---
@@ -105,8 +108,103 @@ related: {related_str}
 
 ---
 
-## STEP 3: wiki本文をLLMが執筆する
+## STEP 3-G: Gemini API で本文を生成する（use_gemini=true の場合のみ）
 
+`use_gemini: true` かつ `source_file_abs_path` が指定されている場合に実行する。
+成功すれば STEP 4 へ進む。失敗した場合は自動的に STEP 3（Claude執筆）にフォールバックする。
+
+```python
+import subprocess
+import sys
+
+GEMINI_SCRIPT = r"C:\Users\takatoshi-saito\OneDrive\00personal\ClaudeCodeFolder\wiki-agent\scripts\gemini_wiki_generator.py"
+
+def call_gemini_body(
+    source_file_abs_path: str,
+    wiki_type:    str,
+    title:        str,
+    destination:  str,
+    scope:        str,
+    domain:       str,
+    tags:         list[str],
+    converted_text: str = "",
+) -> dict:
+    """
+    gemini_wiki_generator.py を --body-only モードで呼び出す。
+    戻り値: {"status": "success", "body": str} または {"status": "error", "reason": str}
+    """
+    cmd = [
+        sys.executable, GEMINI_SCRIPT,
+        source_file_abs_path,
+        "--body-only",
+        "--wiki-type",  wiki_type,
+        "--title",      title,
+        "--dest",       destination,
+        "--scope",      scope,
+        "--domain",     domain,
+        "--tags",       ",".join(tags),
+    ]
+    # convert-binary.md の抽出結果がある場合は渡して再抽出を省略
+    if converted_text:
+        cmd += ["--converted-text", converted_text[:30000]]
+
+    try:
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=120,
+        )
+        if result.returncode != 0:
+            return {"status": "error", "reason": result.stderr.strip()}
+        body = result.stdout.strip()
+        if not body:
+            return {"status": "error", "reason": "Gemini から空の本文が返されました"}
+        return {"status": "success", "body": body}
+    except subprocess.TimeoutExpired:
+        return {"status": "error", "reason": "Gemini API タイムアウト（120秒）"}
+    except Exception as e:
+        return {"status": "error", "reason": str(e)}
+```
+
+### 実行フロー
+
+```python
+body = None
+generation_method = "claude"   # ログ記録用
+
+if use_gemini and source_file_abs_path:
+    print("🤖 Gemini API で本文を生成中...")
+    gemini_result = call_gemini_body(
+        source_file_abs_path = source_file_abs_path,
+        wiki_type    = wiki_type,
+        title        = title_suggestion,
+        destination  = wiki_destination,
+        scope        = scope,
+        domain       = domain,
+        tags         = tags,
+        converted_text = converted_text,
+    )
+    if gemini_result["status"] == "success":
+        body = gemini_result["body"]
+        generation_method = "gemini"
+        print("✅ Gemini による本文生成完了")
+    else:
+        print(f"⚠️  Gemini 失敗（{gemini_result['reason']}）→ Claude で執筆します")
+        # body = None のまま STEP 3（Claude）へフォールバック
+
+# Gemini 未使用 or フォールバック → STEP 3（Claude執筆）へ
+if body is None:
+    # → 以下の STEP 3 の処理を実行する
+    pass
+```
+
+---
+
+## STEP 3: wiki本文をLLMが執筆する（Claude モード / Gemini フォールバック時）
+
+`use_gemini=false` の場合、または Gemini が失敗した場合に実行する。
 `wiki_type` に応じたテンプレートと変換テキストを使い、LLMが本文を執筆する。
 
 ### テンプレート定義
@@ -351,8 +449,9 @@ saved_path: "KnowledgeBase/kyorindo/cx/strategy/CX推進ロードマップ_v4_20
 filename: "CX推進ロードマップ_v4_20260501.md"
 wiki_type: "strategy"
 title: "CX推進ロードマップ v4"
-overview_updated: true   # _overview.md の更新を実施したか
-next_skill: "place-wiki.md"  # 次に呼び出すスキル
+overview_updated: true        # _overview.md の更新を実施したか
+generation_method: "gemini"   # gemini | claude | claude_fallback
+next_skill: "place-wiki.md"   # 次に呼び出すスキル
 ```
 
 ---

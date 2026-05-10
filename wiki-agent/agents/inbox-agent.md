@@ -153,7 +153,23 @@ destination: "{destination}"
 title:       "{title}"
 content:     "{convert で得たテキスト}"
 source_file: "{元ファイル名}"
+# ── Gemini モード用（呼び出し元から use_gemini=true が指定された場合のみ）──
+use_gemini:           "{use_gemini}"          # true / false
+source_file_abs_path: "{元ファイルの絶対パス}"  # Gemini が直接読み取るために使用
 ```
+
+### Geminiモードについて
+
+**Geminiモードはデフォルトで有効**（`use_gemini: true`）。
+write-wiki の本文生成を Gemini 2.5 Flash API に委譲することで低コスト化・Excel/PPTX実内容読取を実現する。
+
+Claudeモードに切り替えたい場合は明示的に指定する：
+```
+inbox処理して。Claudeモードで。（use_gemini=false）
+```
+
+通常は `use_gemini: true` と `source_file_abs_path`（元ファイルの絶対パス）を
+pipeline_input に含めて write-wiki.md を呼び出すこと。
 
 ---
 
